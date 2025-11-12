@@ -4,7 +4,8 @@
   HELPER FUNCTIONS
  */
 
-function formr_log($msg, $type = '') {// shorthand
+function formr_log($msg, $type = '')
+{ // shorthand
     $msg = print_r($msg, true);
     $msg = date('Y-m-d H:i:s') . ' ' . $msg;
     if ($type) {
@@ -18,7 +19,8 @@ function formr_log($msg, $type = '') {// shorthand
     error_log($msg . "\n", 3, get_log_file('errors.log'));
 }
 
-function formr_log_exception(Exception $e, $prefix = '', $debug_data = null) {
+function formr_log_exception(Exception $e, $prefix = '', $debug_data = null)
+{
     $msg = $prefix . ' Exception: ' . $e->getMessage() . "\n" . $e->getTraceAsString();
     formr_log($msg);
     if ($debug_data !== null) {
@@ -26,15 +28,17 @@ function formr_log_exception(Exception $e, $prefix = '', $debug_data = null) {
     }
 }
 
-function get_log_file($filename) {
-    if(Config::get('error_to_stderr') == 1) {
+function get_log_file($filename)
+{
+    if (Config::get('error_to_stderr') == 1) {
         return "php://stderr";
     } else {
         return APPLICATION_ROOT . "tmp/logs/$filename";
     }
 }
 
-function alert($msg, $class = 'alert-warning', $dismissable = true) { // shorthand
+function alert($msg, $class = 'alert-warning', $dismissable = true)
+{ // shorthand
     global $site;
     if (!is_object($site)) {
         $site = Site::getInstance();
@@ -42,7 +46,8 @@ function alert($msg, $class = 'alert-warning', $dismissable = true) { // shortha
     $site->alert($msg, $class, $dismissable);
 }
 
-function notify_user_error($error, $public_message = '') {
+function notify_user_error($error, $public_message = '')
+{
     $run_session = Site::getInstance()->getRunSession();
     $date = date('Y-m-d H:i:s');
 
@@ -58,7 +63,8 @@ function notify_user_error($error, $public_message = '') {
     alert($message, 'alert-danger');
 }
 
-function print_hidden_opencpu_debug_message($ocpu_req, $public_message = '') {
+function print_hidden_opencpu_debug_message($ocpu_req, $public_message = '')
+{
     $run_session = Site::getInstance()->getRunSession();
     if ($run_session && !$run_session->isCron() && $run_session->isTesting()) {
         $date = date('Y-m-d H:i:s');
@@ -70,10 +76,11 @@ function print_hidden_opencpu_debug_message($ocpu_req, $public_message = '') {
     }
 }
 
-function redirect_to($location = '', $params = array()) {
-	if (formr_in_console()) {
-		return;
-	}
+function redirect_to($location = '', $params = array())
+{
+    if (formr_in_console()) {
+        return;
+    }
 
     $location = str_replace(PHP_EOL, '', (string)$location);
     if (strpos($location, 'index') !== false) {
@@ -98,7 +105,8 @@ function redirect_to($location = '', $params = array()) {
     exit;
 }
 
-function session_over($site, $user) {
+function session_over($site, $user)
+{
     static $closed;
     if ($closed) {
         return false;
@@ -112,7 +120,8 @@ function session_over($site, $user) {
     return true;
 }
 
-function formr_error($code = 500, $title = 'Bad Request', $text = 'Request could not be processed', $hint = null, $link = null, $link_text = null) {
+function formr_error($code = 500, $title = 'Bad Request', $text = 'Request could not be processed', $hint = null, $link = null, $link_text = null)
+{
     $code = $code ? $code : 500;
     $text = str_replace(APPLICATION_ROOT, '', $text);
     if ($link === null) {
@@ -140,19 +149,22 @@ function formr_error($code = 500, $title = 'Bad Request', $text = 'Request could
     $response->setStatusCode($code, $title)->setContent($view->render())->send();
 }
 
-function formr_error_feature_unavailable() {
+function formr_error_feature_unavailable()
+{
     formr_error('503', 'Feature Unavailable', 'Sorry this feature is temporarily unavailable. Please try again later', '', 'javascript:history.back();', 'Go Back');
 }
 
-function h($text) {
+function h($text)
+{
     if ($text === null) {
         return null;
     }
-    
+
     return htmlspecialchars($text);
 }
 
-function debug($string) {
+function debug($string)
+{
     if (DEBUG) {
         echo "<pre>";
         print_r($string);
@@ -160,7 +172,8 @@ function debug($string) {
     }
 }
 
-function pr($string, $log = false) {
+function pr($string, $log = false)
+{
     if (DEBUG > 0 && !$log) {
         echo "<pre>";
         var_dump($string);
@@ -170,7 +183,8 @@ function pr($string, $log = false) {
     }
 }
 
-function prb($string = null) {
+function prb($string = null)
+{
     static $output = "";
     if ($string === null) {
         if (DEBUG > 0) {
@@ -188,13 +202,14 @@ function prb($string = null) {
 
 if (!function_exists('_')) {
 
-    function _($text) {
+    function _($text)
+    {
         return $text;
     }
-
 }
 
-function used_opencpu($echo = false) {
+function used_opencpu($echo = false)
+{
     static $used;
     if ($echo):
         pr("Requests: " . $used);
@@ -208,7 +223,8 @@ function used_opencpu($echo = false) {
     return $used;
 }
 
-function used_cache($echo = false) {
+function used_cache($echo = false)
+{
     static $used;
     if ($echo):
         pr("Hashcache: " . $used);
@@ -222,7 +238,8 @@ function used_cache($echo = false) {
     return $used;
 }
 
-function used_nginx_cache($echo = false) {
+function used_nginx_cache($echo = false)
+{
     static $used;
     if ($echo):
         pr("Nginx: " . $used);
@@ -241,7 +258,8 @@ if (!function_exists('__')) {
     /**
       taken from cakePHP
      */
-    function __($singular, $args = null) {
+    function __($singular, $args = null)
+    {
         if (!$singular) {
             return;
         }
@@ -254,12 +272,12 @@ if (!function_exists('__')) {
         }
         return vsprintf($translated, $args);
     }
-
 }
 
 if (!function_exists('__n')) {
 
-    function __n($singular, $plural, $count, $args = null) {
+    function __n($singular, $plural, $count, $args = null)
+    {
         if (!$singular) {
             return;
         }
@@ -272,10 +290,10 @@ if (!function_exists('__n')) {
         }
         return vsprintf($translated, $args);
     }
-
 }
 
-function endsWith($haystack, $needle) {
+function endsWith($haystack, $needle)
+{
     $length = strlen($needle);
     if ($length == 0) {
         return true;
@@ -294,7 +312,8 @@ function endsWith($haystack, $needle) {
  * @return string Environment variable setting.
  * @link https://book.cakephp.org/2.0/en/core-libraries/global-constants-and-functions.html#env
  */
-function env($key) {
+function env($key)
+{
     if ($key === 'HTTPS') {
         if (isset($_SERVER['HTTPS'])) {
             return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -341,7 +360,7 @@ function env($key) {
             if (!mb_strpos($name, '.php')) {
                 $offset = 4;
             }
-            return mb_substr($filename, 0, -(strlen($name) + $offset));
+            return mb_substr($filename, 0, - (strlen($name) + $offset));
         case 'PHP_SELF':
             return str_replace(env('DOCUMENT_ROOT'), '', env('SCRIPT_FILENAME'));
         case 'CGI_MODE':
@@ -389,11 +408,13 @@ function env($key) {
     return null;
 }
 
-function emptyNull(&$x) {
+function emptyNull(&$x)
+{
     $x = is_formr_truthy($x) ? $x : null;
 }
 
-function stringBool($x) {
+function stringBool($x)
+{
     if ($x === false) {
         return 'false';
     } elseif ($x === true) {
@@ -402,19 +423,20 @@ function stringBool($x) {
         return 'null';
     } elseif ($x === 0) {
         return '0';
-    } elseif (is_array($x) AND empty($x)) {
+    } elseif (is_array($x) and empty($x)) {
         return "NA";
     }
 
     return $x;
 }
 
-function hardTrueFalse($x) {
+function hardTrueFalse($x)
+{
     if ($x === false) {
         return 'FALSE';
     } elseif ($x === true) {
         return 'TRUE';
-#	elseif($x===null)  return 'NULL';
+        #	elseif($x===null)  return 'NULL';
     } elseif ($x === 0) {
         return '0';
     }
@@ -424,7 +446,8 @@ function hardTrueFalse($x) {
 
 if (!function_exists('http_parse_headers')) {
 
-    function http_parse_headers($raw_headers) {
+    function http_parse_headers($raw_headers)
+    {
         $headers = array();
         $key = ''; // [+]
 
@@ -456,7 +479,6 @@ if (!function_exists('http_parse_headers')) {
 
         return $headers;
     }
-
 }
 
 /**
@@ -465,7 +487,8 @@ if (!function_exists('http_parse_headers')) {
  * @param   int     $timestamp
  * @return  string
  */
-function timetostr($timestamp) {
+function timetostr($timestamp)
+{
     if ($timestamp === false) {
         return "";
     }
@@ -508,17 +531,20 @@ function timetostr($timestamp) {
 }
 
 // from https://de1.php.net/manual/en/function.filesize.php
-function human_filesize($bytes, $decimals = 2) {
+function human_filesize($bytes, $decimals = 2)
+{
     $sz = 'BKMGTP';
     $factor = floor((strlen($bytes) - 1) / 3);
     return sprintf("%.{$decimals}f", $bytes / pow(1024, $factor)) . @$sz[$factor];
 }
 
-function cr2nl($string) {
+function cr2nl($string)
+{
     return str_replace("\r\n", "\n", (string)$string);
 }
 
-function time_point($line, $file) {
+function time_point($line, $file)
+{
     static $times, $points;
     if (empty($times)) {
         $times = array($_SERVER["REQUEST_TIME_FLOAT"]);
@@ -531,17 +557,19 @@ function time_point($line, $file) {
     return $points;
 }
 
-function echo_time_points($points) {
-//	echo "<!---";
+function echo_time_points($points)
+{
+    //	echo "<!---";
     for ($i = 0; $i < count($points); $i++):
         echo $points[$i] . "<br>
 ";
     endfor;
     echo "took " . round((microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]) / 60, 6) . " minutes to the end";
-//	echo "--->";
+    //	echo "--->";
 }
 
-function crypto_token($length, $url = true) {
+function crypto_token($length, $url = true)
+{
     $bytes = openssl_random_pseudo_bytes($length, $crypto_strong);
     $base64 = base64_url_encode($bytes);
     if (!$crypto_strong) {
@@ -550,11 +578,13 @@ function crypto_token($length, $url = true) {
     return $base64;
 }
 
-function base64_url_encode($data) {
+function base64_url_encode($data)
+{
     return strtr(base64_encode($data), '+/=', '-_~');
 }
 
-function base64_url_decode($data) {
+function base64_url_decode($data)
+{
     return base64_decode(strtr($data, '-_~', '+/='));
 }
 
@@ -570,7 +600,8 @@ function base64_url_decode($data) {
  * @param strin $lowercase Should string be returned in lowecase letters
  * @return	string
  */
-function url_title($str, $separator = '-', $lowercase = false) {
+function url_title($str, $separator = '-', $lowercase = false)
+{
     if ($separator == 'dash') {
         $separator = '-';
     } else if ($separator == 'underscore') {
@@ -595,13 +626,16 @@ function url_title($str, $separator = '-', $lowercase = false) {
     return trim($str, $separator);
 }
 
-function empty_column($col, $arr) {
+function empty_column($col, $arr)
+{
     $empty = true;
     $last = null;
-    foreach ($arr AS $row):
-        if (!(empty($row->$col)) || // not empty column? (also treats 0 and empty strings as empty)
-                $last != $row->$col || // any variation in this column?
-                !(!is_array($row->$col) && trim((string)$row->$col) == '')):
+    foreach ($arr as $row):
+        if (
+            !(empty($row->$col)) || // not empty column? (also treats 0 and empty strings as empty)
+            $last != $row->$col || // any variation in this column?
+            !(!is_array($row->$col) && trim((string)$row->$col) == '')
+        ):
             $empty = false;
             break;
         endif;
@@ -616,7 +650,8 @@ function empty_column($col, $arr) {
  * @param string $dir Absolute path to readable directory
  * @return mixed Returns an array if all is well or FALSE otherwise
  */
-function get_run_dir_contents($dir) {
+function get_run_dir_contents($dir)
+{
     if (!$dir || !is_dir($dir) || !is_readable($dir)) {
         return false;
     }
@@ -644,7 +679,8 @@ function get_run_dir_contents($dir) {
  * @param string $filename
  * @return mixed Returns the mime type as a string or FALSE otherwise
  */
-function get_file_mime($filename) {
+function get_file_mime($filename)
+{
     $constant = defined('FILEINFO_MIME_TYPE') ? FILEINFO_MIME_TYPE : FILEINFO_MIME;
     $finfo = finfo_open($constant);
     $info = finfo_file($finfo, $filename);
@@ -665,7 +701,8 @@ function get_file_mime($filename) {
  * @param boolean $unlink
  * @todo implement caching stuff
  */
-function download_file($file, $unlink = false) {
+function download_file($file, $unlink = false)
+{
     $type = get_file_mime($file);
     $filename = basename($file);
     $filesize = filesize($file);
@@ -688,7 +725,8 @@ function download_file($file, $unlink = false) {
 /**
  * @deprecated
  */
-function get_duplicate_update_string($columns) {
+function get_duplicate_update_string($columns)
+{
     foreach ($columns as $i => $column) {
         $column = trim($column, '`');
         $columns[$i] = "`$column` = VALUES(`$column`)";
@@ -702,7 +740,8 @@ function get_duplicate_update_string($columns) {
  * @param int $time [optional] Valid unix timestamp
  * @return string
  */
-function mysql_datetime($time = null) {
+function mysql_datetime($time = null)
+{
     if ($time === null) {
         $time = time();
     }
@@ -717,7 +756,8 @@ function mysql_datetime($time = null) {
  *
  * @return string
  */
-function mysql_now() {
+function mysql_now()
+{
     return mysql_datetime();
 }
 
@@ -727,14 +767,16 @@ function mysql_now() {
  * @param string A string defining an interval accepted by PHP's strtotime() function
  * @return string
  */
-function mysql_interval($interval) {
+function mysql_interval($interval)
+{
     if (($time = strtotime($interval)) === false) {
         throw new Exception("Invalid time interval given to strtotime '$interval'");
     }
     return mysql_datetime($time);
 }
 
-function site_url($uri = '', $params = array()) {
+function site_url($uri = '', $params = array())
+{
     $url = WEBROOT;
     if ($uri) {
         // Remove any leading/trailing slashes from the URI
@@ -753,7 +795,8 @@ function site_url($uri = '', $params = array()) {
     return $url;
 }
 
-function admin_url($uri = '', $params = array()) {
+function admin_url($uri = '', $params = array())
+{
     if ($uri) {
         $uri = '/' . $uri;
     }
@@ -768,7 +811,8 @@ function admin_url($uri = '', $params = array()) {
  * @param array $params Additional parameters to include in the URL
  * @return string The generated URL, always ends with a slash
  */
-function run_url($name = '', $action = '', $params = array()) {
+function run_url($name = '', $action = '', $params = array())
+{
     if ($name === Run::TEST_RUN) {
         return site_url('run/' . $name . '/' . $action);
     }
@@ -777,7 +821,7 @@ function run_url($name = '', $action = '', $params = array()) {
     # use different domain for studies if set, independent of wildcard subdomain setting
     $domain = trim(Config::get('study_domain', ''), "*\/\\");
     $subdomain = null;
-    
+
     if (Config::get('use_study_subdomains')) {
         $subdomain = strtolower($name);
     } else {
@@ -798,14 +842,16 @@ function run_url($name = '', $action = '', $params = array()) {
     return $url;
 }
 
-function admin_study_url($name = '', $action = '', $params = array()) {
+function admin_study_url($name = '', $action = '', $params = array())
+{
     if ($action) {
         $name = $name . '/' . $action;
     }
     return admin_url('survey/' . $name, $params);
 }
 
-function admin_run_url($name = '', $action = '', $params = array()) {
+function admin_run_url($name = '', $action = '', $params = array())
+{
     if ($action) {
         $name = $name . '/' . $action;
     }
@@ -821,14 +867,15 @@ function admin_run_url($name = '', $action = '', $params = array()) {
  *     'study_name' => string|null
  * ]
  */
-function determine_session_context() {
+function determine_session_context()
+{
     $current_domain = isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : '';
     $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
     $path_segments = explode('/', trim($request_uri, '/'));
     $first_segment = !empty($path_segments[0]) ? $path_segments[0] : '';
-	$admin_domain = Config::get('admin_domain');
-	$study_domain = Config::get('study_domain');
-    
+    $admin_domain = Config::get('admin_domain');
+    $study_domain = Config::get('study_domain');
+
     // Variables to return
     $session_path = "/";
     $session_context = "main";
@@ -836,41 +883,43 @@ function determine_session_context() {
     $is_admin = false;
 
     // Determine if we're on admin path
-	if($first_segment === 'admin') {
-		if(strpos($current_domain, $admin_domain) !== false) {
-			$session_path = '/admin/';
-			$session_context = 'admin';
-			$is_admin = true;
-		} else {
-			redirect_to($admin_domain . $request_uri);
-			exit;
-		}
-	} else {
+    if ($first_segment === 'admin') {
+        if (strpos($current_domain, $admin_domain) !== false) {
+            $session_path = '/admin/';
+            $session_context = 'admin';
+            $is_admin = true;
+        } else {
+            redirect_to($admin_domain . $request_uri);
+            exit;
+        }
+    } else {
         // Check if we're on study subdomain
-		if(Config::get('use_study_subdomains') and strpos($current_domain, ".") !== false) {
-			// Extract study name from subdomain (first part)
-			$study_tld = explode('*.', Config::get('study_domain'))[1];
-			$study_parts = explode('.', $current_domain, 2);
-			$study_name = !empty($study_parts[0]) ? $study_parts[0] : '';
-			
-			if (strpos($current_domain, $study_tld) !== false && !empty($study_name)) {
-				$session_path = '/';
-				$session_context = 'study';
-			}
-		} else if (!empty($study_domain) && strpos($current_domain, $study_domain) !== false && 
+        if (Config::get('use_study_subdomains') and strpos($current_domain, ".") !== false) {
+            // Extract study name from subdomain (first part)
+            $study_tld = explode('*.', Config::get('study_domain'))[1];
+            $study_parts = explode('.', $current_domain, 2);
+            $study_name = !empty($study_parts[0]) ? $study_parts[0] : '';
+
+            if (strpos($current_domain, $study_tld) !== false && !empty($study_name)) {
+                $session_path = '/';
+                $session_context = 'study';
+            }
+        } else if (
+            !empty($study_domain) && strpos($current_domain, $study_domain) !== false &&
             (empty($admin_domain) || strpos($current_domain, $admin_domain) === false) &&
-			count($path_segments) > 0) {
+            count($path_segments) > 0
+        ) {
             // Extract study name from subdomain (first part)
             $study_name = $first_segment;
-            
+
             if (!empty($study_name)) {
-				$session_path = '/' . $first_segment . '/';
+                $session_path = '/' . $first_segment . '/';
                 $session_context = 'study';
-				$study_name = $first_segment;
+                $study_name = $first_segment;
             }
         }
     }
-    
+
     return [
         'path' => $session_path,
         'context' => $session_context,
@@ -886,14 +935,15 @@ function determine_session_context() {
  *  @param $file  The file to be loaded. Must not start with a slash.
  *  @param $add_mtime  Whether to add the mtime to the file name.
  */
-function asset_url($file, $add_mtime = true) {
+function asset_url($file, $add_mtime = true)
+{
     if (strpos($file, 'http') !== false || strpos($file, '//') === 0) {
         return $file;
     }
     if (strpos($file, 'assets') === false) {
         $file = 'assets/' . $file;
     }
-    if($add_mtime) {
+    if ($add_mtime) {
         $mtime = @filemtime(APPLICATION_ROOT . "webroot/" . $file);
         if (!$mtime) {
             return site_url($file);
@@ -903,11 +953,13 @@ function asset_url($file, $add_mtime = true) {
     return site_url($file);
 }
 
-function monkeybar_url($run_name, $action = '', $params = array()) {
+function monkeybar_url($run_name, $action = '', $params = array())
+{
     return run_url($run_name, 'monkey-bar/' . $action, $params);
 }
 
-function array_to_accordion($array) {
+function array_to_accordion($array)
+{
     $rand = mt_rand(0, 10000);
     $acc = '<div class="panel-group opencpu_accordion" id="opencpu_accordion' . $rand . '">';
     $first = ' in';
@@ -938,7 +990,8 @@ function array_to_accordion($array) {
     return $acc;
 }
 
-function array_to_orderedlist($array, $olclass = null, $liclass = null) {
+function array_to_orderedlist($array, $olclass = null, $liclass = null)
+{
     $ol = '<ol class="' . $olclass . '">';
     foreach ($array as $title => $label) {
         if (is_formr_truthy($label)) {
@@ -949,7 +1002,8 @@ function array_to_orderedlist($array, $olclass = null, $liclass = null) {
     return $ol;
 }
 
-function is_formr_truthy($value) {
+function is_formr_truthy($value)
+{
     if (is_array($value)) {
         return $value;
     }
@@ -966,7 +1020,8 @@ function is_formr_truthy($value) {
  * @param string $context
  * @return string Returns R variables
  */
-function opencpu_define_vars(array $data, $context = null) {
+function opencpu_define_vars(array $data, $context = null)
+{
     $vars = '';
     if (!$data) {
         return $vars;
@@ -1002,7 +1057,8 @@ function opencpu_define_vars(array $data, $context = null) {
  * @param bool $return_session Should OpenCPU_Session object be returned
  * @return string|OpenCPU_Session|null Returns null if an error occured so check the return value using the equivalence operator (===)
  */
-function opencpu_get($location, $return_format = 'json', $context = null, $return_session = false) {
+function opencpu_get($location, $return_format = 'json', $context = null, $return_session = false)
+{
     $uri = $location . $return_format;
     try {
         $session = OpenCPU::getInstance()->get($uri);
@@ -1030,11 +1086,34 @@ function opencpu_get($location, $return_format = 'json', $context = null, $retur
  * @param bool $return_session Should OpenCPU_Session object be returned
  * @return string|OpenCPU_Session|null Returns null if an error occured so check the return value using the equivalence operator (===)
  */
-function opencpu_evaluate($code, $variables = null, $return_format = 'json', $context = null, $return_session = false) {
+function opencpu_evaluate($code, $variables = null, $return_format = 'json', $context = null, $return_session = false)
+{
     if ($return_session !== true) {
         $result = shortcut_without_opencpu($code, $variables);
         if ($result !== null) {
             return current($result);
+        }
+    }
+
+    $temp_token_to_delete = null;
+    // When R code contains formr_api_authenticate, create an access token for the run owner
+    if (strpos($code, 'formr_api_authenticate') !== false) {
+        $run_session = run_session(); // Get the current run session
+        if ($run_session) {
+            $run = $run_session->getRun();
+            $owner = $run->getOwner(); // Get the user object of the run owner
+            if ($owner && $owner->id) {
+                $oauth = OAuthHelper::getInstance();
+                $token_data = $oauth->createAccessTokenForUser($owner);
+                if ($token_data && !empty($token_data['access_token'])) {
+                    if ($variables === null) {
+                        $variables = [];
+                    }
+                    // Pass the owner's token to R as a variable.
+                    $variables['access_token'] = "'" . $token_data['access_token'] . "'"; // The value must be quoted for R
+                    $temp_token_to_delete = $token_data['access_token'];
+                }
+            }
         }
     }
 
@@ -1053,6 +1132,9 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
     try {
         $session = OpenCPU::getInstance()->post($uri, $params);
         if ($return_session === true) {
+            if ($temp_token_to_delete) {
+                OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+            }
             return $session;
         }
 
@@ -1062,10 +1144,17 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
             print_hidden_opencpu_debug_message($session, "OpenCPU debugger for run R code.");
         }
 
-        return $return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format);
+        $result = $return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format);
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+        return $result;
     } catch (OpenCPU_Exception $e) {
         notify_user_error($e, "There was a computational error.");
         opencpu_log($e);
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
         return null;
     }
 }
@@ -1077,7 +1166,8 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
  * @param array data for openCPU
  * @return mixed|null Returns null if things aren't simple, so check the return value using the equivalence operator (===)
  */
-function shortcut_without_opencpu($code, $data) {
+function shortcut_without_opencpu($code, $data)
+{
     if ($code === 'tail(survey_unit_sessions$created,1)') {
         return array(end($data['datasets']['survey_unit_sessions']['created']));
     } elseif (preg_match("/^([a-zA-Z0-9_]+)\\\$([a-zA-Z0-9_]+)$/", (string)$code, $matches)) {
@@ -1099,7 +1189,8 @@ function shortcut_without_opencpu($code, $data) {
  * @param bool $return_session Should OpenCPU_Session object be returned
  * @return OpenCPU_Session|string|null
  */
-function opencpu_knit($code, $return_format = 'json', $self_contained = 1, $return_session = false) {
+function opencpu_knit($code, $return_format = 'json', $self_contained = 1, $return_session = false)
+{
     $params = array('text' => "'" . addslashes($code) . "'");
     $uri = '/knitr/R/knit/' . $return_format;
 
@@ -1120,7 +1211,8 @@ function opencpu_knit($code, $return_format = 'json', $self_contained = 1, $retu
     }
 }
 
-function opencpu_knit_plaintext($source, $variables = null, $return_session = false, $context = null) {
+function opencpu_knit_plaintext($source, $variables = null, $return_session = false, $context = null)
+{
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables, $context);
     }
@@ -1129,7 +1221,7 @@ function opencpu_knit_plaintext($source, $variables = null, $return_session = fa
 
     $show_errors = 'FALSE';
     $show_warnings = 'FALSE';
-    if (!$run_session OR $run_session->isTesting()) {
+    if (!$run_session or $run_session->isTesting()) {
         $show_errors = 'FALSE';
         $show_warnings = 'TRUE';
     }
@@ -1141,7 +1233,7 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
 ```
 ' .
-            $source;
+        $source;
 
     $result = opencpu_knit($source, 'json', 0, $return_session);
 
@@ -1160,7 +1252,8 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
  * @param bool $return_session Should OpenCPU_Session object be returned
  * @return string|null
  */
-function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false) {
+function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false)
+{
     $params = array('text' => "'" . addslashes($source) . "'", 'self_contained' => $self_contained);
     $uri = '/formr/R/formr_render_commonmark/' . $return_format;
 
@@ -1183,7 +1276,8 @@ function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1
     }
 }
 
-function opencpu_knit_iframe($source, $variables = null, $return_session = false, $context = null, $description = '', $footer_text = '') {
+function opencpu_knit_iframe($source, $variables = null, $return_session = false, $context = null, $description = '', $footer_text = '')
+{
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables, $context);
     }
@@ -1192,7 +1286,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
 
     $show_errors = 'FALSE';
     $show_warnings = 'FALSE';
-    if (!$run_session OR $run_session->isTesting()) {
+    if (!$run_session or $run_session->isTesting()) {
         $show_errors = 'TRUE';
         $show_warnings = 'TRUE';
     }
@@ -1206,19 +1300,19 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     }
 
     $source = $yaml .
-            '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . '}
+        '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . '}
 library(knitr); library(formr)
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
 ```
 
 ' .
-            $description . '
+        $description . '
 
 
 ' .
-            $source .
-            "
+        $source .
+        "
 
 
 
@@ -1247,7 +1341,8 @@ opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',err
     }
 }
 
-function opencpu_knitdisplay($source, $variables = null, $return_session = false, $context = null) {
+function opencpu_knitdisplay($source, $variables = null, $return_session = false, $context = null)
+{
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables, $context);
     }
@@ -1256,7 +1351,7 @@ function opencpu_knitdisplay($source, $variables = null, $return_session = false
 
     $show_errors = 'FALSE';
     $show_warnings = 'FALSE';
-    if (!$run_session OR $run_session->isTesting()) {
+    if (!$run_session or $run_session->isTesting()) {
         $show_errors = 'TRUE';
         $show_warnings = 'TRUE';
     }
@@ -1268,12 +1363,13 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
 ```
 ' .
-            $source;
+        $source;
 
     return opencpu_knit2html($source, 'json', 0, $return_session);
 }
 
-function opencpu_knitadmin($source, $variables = null, $return_session = false) {
+function opencpu_knitadmin($source, $variables = null, $return_session = false)
+{
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1282,7 +1378,7 @@ function opencpu_knitadmin($source, $variables = null, $return_session = false) 
 
     $show_errors = 'FALSE';
     $show_warnings = 'FALSE';
-    if (!$run_session OR $run_session->isTesting()) {
+    if (!$run_session or $run_session->isTesting()) {
         $show_errors = 'TRUE';
         $show_warnings = 'TRUE';
     }
@@ -1294,12 +1390,13 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
 ```
 ' .
-            $source;
+        $source;
 
     return opencpu_knit2html($source, 'json', 0, $return_session);
 }
 
-function opencpu_knit_email($source, array $variables = null, $return_format = 'json', $return_session = false) {
+function opencpu_knit_email($source, array $variables = null, $return_format = 'json', $return_session = false)
+{
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1307,7 +1404,7 @@ function opencpu_knit_email($source, array $variables = null, $return_format = '
 
     $show_errors = 'FALSE';
     $show_warnings = 'FALSE';
-    if (!$run_session OR $run_session->isTesting()) {
+    if (!$run_session or $run_session->isTesting()) {
         $show_errors = 'TRUE';
         $show_warnings = 'TRUE';
     }
@@ -1319,16 +1416,18 @@ opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' . $variables . '
 ```
 ' .
-            $source;
+        $source;
 
     return opencpu_knit2html($source, $return_format, 0, $return_session);
 }
 
-function opencpu_string_key($index) {
+function opencpu_string_key($index)
+{
     return 'formr-ocpu-label-' . $index;
 }
 
-function opencpu_string_key_parsing($strings) {
+function opencpu_string_key_parsing($strings)
+{
     $ret = array();
     foreach ($strings as $index => $string) {
         $ret['formr-ocpu-label-' . $index] = $string;
@@ -1343,7 +1442,8 @@ function opencpu_string_key_parsing($strings) {
  * @param array $string_templates An array of strings to be parsed
  * @return array Returns an array of parsed labels indexed by the label-key to be substituted
  */
-function opencpu_multistring_parse(UnitSession $unitSession, array $string_templates) {
+function opencpu_multistring_parse(UnitSession $unitSession, array $string_templates)
+{
     $survey = $unitSession->runUnit->surveyStudy;
     $markdown = implode(OpenCPU::STRING_DELIMITER, $string_templates);
     $opencpu_vars = $unitSession->getRunData($markdown, $survey->name);
@@ -1369,7 +1469,8 @@ function opencpu_multistring_parse(UnitSession $unitSession, array $string_templ
  * @param array $array An array of data contaning label templates
  * @param array $parsed_strings An array of parsed labels
  */
-function opencpu_substitute_parsed_strings(array &$array, array $parsed_strings) {
+function opencpu_substitute_parsed_strings(array &$array, array $parsed_strings)
+{
     foreach ($array as $key => &$value) {
         if (is_array($array[$key])) {
             opencpu_substitute_parsed_strings($array[$key], $parsed_strings);
@@ -1382,7 +1483,8 @@ function opencpu_substitute_parsed_strings(array &$array, array $parsed_strings)
     }
 }
 
-function opencpu_multiparse_showif(UnitSession $unitSession, array $showifs, $return_session = false) {
+function opencpu_multiparse_showif(UnitSession $unitSession, array $showifs, $return_session = false)
+{
     $survey = $unitSession->runUnit->surveyStudy;
     $code = "(function() {with(tail({$survey->name}, 1), {\n";
     $code .= "formr.showifs = list();\n";
@@ -1395,7 +1497,8 @@ function opencpu_multiparse_showif(UnitSession $unitSession, array $showifs, $re
     return opencpu_evaluate($code, $variables, 'json', null, $return_session);
 }
 
-function opencpu_multiparse_values(UnitSession $unitSession, array $values, $return_session = false) {
+function opencpu_multiparse_values(UnitSession $unitSession, array $values, $return_session = false)
+{
     $survey = $unitSession->runUnit->surveyStudy;
     $code = "(function() {with(tail({$survey->name}, 1), {\n";
     $code .= "list(\n" . implode(",\n", $values) . "\n)";
@@ -1405,7 +1508,8 @@ function opencpu_multiparse_values(UnitSession $unitSession, array $values, $ret
     return opencpu_evaluate($code, $variables, 'json', null, $return_session);
 }
 
-function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json') {
+function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
+{
     $debug = array();
     if (empty($session)) {
         $debug['Response'] = 'No OpenCPU_Session found. Server may be down.';
@@ -1446,9 +1550,9 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json') {
             }
 
             $urls = $session->getFiles();
-            if (!$session->hasError() AND!empty($urls)) {
+            if (!$session->hasError() and !empty($urls)) {
                 $locations = '';
-                foreach ($urls AS $path => $link) {
+                foreach ($urls as $path => $link) {
                     $path = str_replace('/ocpu/tmp/' . $session->getKey(), '', $path);
                     $locations .= "<a href='$link'>$path</a><br />";
                 }
@@ -1472,7 +1576,8 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json') {
     return array_to_accordion($debug);
 }
 
-function opencpu_log($msg) {
+function opencpu_log($msg)
+{
     $log = '';
     if ($msg instanceof Exception) {
         $log .= $msg->getMessage() . "\n" . $msg->getTraceAsString();
@@ -1482,7 +1587,8 @@ function opencpu_log($msg) {
     error_log($log . "\n", 3, get_log_file('opencpu.log'));
 }
 
-function opencpu_formr_variables($q) {
+function opencpu_formr_variables($q)
+{
     $variables = [];
     if (preg_match("/\btime_passed\b/", (string)$q)) {
         $variables[] = 'formr_last_action_time';
@@ -1515,7 +1621,8 @@ function opencpu_formr_variables($q) {
  * @param mixed $session Optional. If provided, sets the global $opencpu_session variable to this value.
  * @return mixed Returns the current value of the global $opencpu_session variable.
  */
-function opencpu_session(OpenCPU_Session $session = null) {
+function opencpu_session(OpenCPU_Session $session = null)
+{
     global $opencpu_session;
     if ($session !== null) {
         $opencpu_session = $session;
@@ -1523,7 +1630,8 @@ function opencpu_session(OpenCPU_Session $session = null) {
     return $opencpu_session;
 }
 
-function opencpu_last_error() {
+function opencpu_last_error()
+{
     global $opencpu_session;
     if ($opencpu_session !== null) {
         return $opencpu_session->getError();
@@ -1537,7 +1645,8 @@ function opencpu_last_error() {
  * @param RunSession $runSession Optional. If provided, sets the global $run_session variable to this value.
  * @return RunSession Returns the current value of the global $run_session variable.
  */
-function run_session(RunSession $runSession = null) {
+function run_session(RunSession $runSession = null)
+{
     global $run_session;
     if ($runSession !== null) {
         $run_session = $runSession;
@@ -1545,12 +1654,14 @@ function run_session(RunSession $runSession = null) {
     return $run_session;
 }
 
-function pre_htmlescape($str) {
+function pre_htmlescape($str)
+{
     $str = (string) $str;
     return '<pre>' . htmlspecialchars($str) . '</pre>';
 }
 
-function array_val($array, $key, $default = "") {
+function array_val($array, $key, $default = "")
+{
     if (!is_array($array)) {
         return false;
     }
@@ -1560,7 +1671,8 @@ function array_val($array, $key, $default = "") {
     return $default;
 }
 
-function shutdown_formr_org() {
+function shutdown_formr_org()
+{
     $user = Site::getCurrentUser();
     if (is_object($user) && $user->cron) {
         return;
@@ -1576,13 +1688,14 @@ function shutdown_formr_org() {
 
         $msg = "A fatal error occured and your request could not be completed. Contact site admins with these details \n";
         $msg .= "Error [$errno] in $errfile line $errline \n $code";
-  
+
         formr_log("$msg \n $errstr", $code);
         formr_error(500, 'Internal Server Error', nl2br($msg), 'Fatal Error');
     }
 }
 
-function remove_tag_wrapper($text, $tag = 'p') {
+function remove_tag_wrapper($text, $tag = 'p')
+{
     $text = trim((string)$text);
     if (preg_match("@^<{$tag}>(.+)</{$tag}>$@", $text, $matches)) {
         $text = isset($matches[1]) ? $matches[1] : $text;
@@ -1590,7 +1703,8 @@ function remove_tag_wrapper($text, $tag = 'p') {
     return $text;
 }
 
-function delete_tmp_file($file) {
+function delete_tmp_file($file)
+{
     // unlink tmp file especially for the case of google sheets
     if (!empty($file['tmp_name']) && file_exists($file['tmp_name'])) {
         @unlink($file['tmp_name']);
@@ -1603,7 +1717,8 @@ function delete_tmp_file($file) {
  * @param string $google_link The URL of the Google Sheet
  * @return array|boolean Returns an array similar to that of an 'uploaded-php-file' or FALSE otherwise;
  */
-function google_download_survey_sheet($google_link) {
+function google_download_survey_sheet($google_link)
+{
     $google_id = google_get_sheet_id($google_link);
     if (!$google_id) {
         return false;
@@ -1629,7 +1744,7 @@ function google_download_survey_sheet($google_link) {
             throw new Exception("The google sheet at {$link} could not be downloaded. Please make sure everyone with the link can access the sheet!");
         }
 
-        if($info['filename'] === NULL) {
+        if ($info['filename'] === NULL) {
             $link = google_get_sheet_link($google_id);
             throw new Exception("The google sheet at {$link} did not specify a name for the survey.");
         }
@@ -1658,7 +1773,8 @@ function google_download_survey_sheet($google_link) {
  * @param string $link
  * @return string|null
  */
-function google_get_sheet_id($link) {
+function google_get_sheet_id($link)
+{
     $matches = array();
     preg_match('/spreadsheets\/d\/(.*)\/edit/', $link, $matches);
     if (!empty($matches[1])) {
@@ -1673,11 +1789,13 @@ function google_get_sheet_id($link) {
  * @param string $id
  * @return string
  */
-function google_get_sheet_link($id) {
+function google_get_sheet_link($id)
+{
     return "https://docs.google.com/spreadsheets/d/{$id}/edit";
 }
 
-function strt_replace($str, $params) {
+function strt_replace($str, $params)
+{
     foreach ($params as $key => $value) {
         $str = str_replace('%{' . $key . '}', $value, $str);
         $str = str_replace('{' . $key . '}', $value, $str);
@@ -1685,14 +1803,16 @@ function strt_replace($str, $params) {
     return $str;
 }
 
-function fill_array($array, $value = '') {
+function fill_array($array, $value = '')
+{
     foreach ($array as $key => $v) {
         $array[$key] = $value;
     }
     return $array;
 }
 
-function files_are_equal($a, $b) {
+function files_are_equal($a, $b)
+{
     if (!file_exists($a) || !file_exists($b))
         return false;
 
@@ -1706,7 +1826,8 @@ function files_are_equal($a, $b) {
     return true;
 }
 
-function create_zip_archive($files, $destination, $overwrite = false) {
+function create_zip_archive($files, $destination, $overwrite = false)
+{
     $zip = new ZipArchive();
 
     if ($zip->open($destination, $overwrite ? ZIPARCHIVE::OVERWRITE : ZIPARCHIVE::CREATE) !== true) {
@@ -1725,7 +1846,8 @@ function create_zip_archive($files, $destination, $overwrite = false) {
     return file_exists($destination);
 }
 
-function create_ini_file($assoc, $filepath) {
+function create_ini_file($assoc, $filepath)
+{
     file_put_contents($filepath, '');
     foreach ($assoc as $section => $fields) {
         file_put_contents($filepath, "[{$section}]\n", FILE_APPEND);
@@ -1737,7 +1859,8 @@ function create_ini_file($assoc, $filepath) {
     return file_exists($filepath);
 }
 
-function deletefiles($files) {
+function deletefiles($files)
+{
     foreach ($files as $file) {
         if (is_file($file)) {
             @unlink($file);
@@ -1745,21 +1868,24 @@ function deletefiles($files) {
     }
 }
 
-function print_stylesheets($files, $id = null) {
+function print_stylesheets($files, $id = null)
+{
     foreach ($files as $i => $file) {
         $id = 'css-' . $i . $id;
         echo '<link href="' . asset_url($file) . '" rel="stylesheet" type="text/css" id="' . $id . '">' . "\n";
     }
 }
 
-function print_scripts($files, $id = null) {
+function print_scripts($files, $id = null)
+{
     foreach ($files as $i => $file) {
         $id = 'js-' . $i . $id;
         echo '<script src="' . asset_url($file) . '" id="' . $id . '"></script>' . "\n";
     }
 }
 
-function fwrite_json($handle, $data) {
+function fwrite_json($handle, $data)
+{
     if ($handle) {
         fseek($handle, 0, SEEK_END);
         if (ftell($handle) > 0) {
@@ -1772,7 +1898,8 @@ function fwrite_json($handle, $data) {
     }
 }
 
-function do_run_shortcodes($text, $run_name, $sess_code) {
+function do_run_shortcodes($text, $run_name, $sess_code)
+{
     $link_tpl = '<a href="%{url}">%{text}</a>';
     if ($run_name) {
         $login_url = run_url($run_name, null, array('code' => $sess_code));
@@ -1804,7 +1931,8 @@ function do_run_shortcodes($text, $run_name, $sess_code) {
     return $text;
 }
 
-function factortosecs($value, $unit) {
+function factortosecs($value, $unit)
+{
     $factors = array(
         'seconds' => 1,
         'minutes' => 60,
@@ -1821,7 +1949,8 @@ function factortosecs($value, $unit) {
     }
 }
 
-function secstofactor($seconds) {
+function secstofactor($seconds)
+{
     if (!$seconds) {
         return null;
     }
@@ -1843,11 +1972,12 @@ function secstofactor($seconds) {
     return array($seconds, 'seconds');
 }
 
-function knitting_needed($source) {
-	if (!$source) {
-		return false;
-	}
-	
+function knitting_needed($source)
+{
+    if (!$source) {
+        return false;
+    }
+
     if (mb_strpos($source, '`r ') !== false || mb_strpos($source, '```{r') !== false) {
         return true;
     }
@@ -1855,7 +1985,8 @@ function knitting_needed($source) {
     return false;
 }
 
-function get_db_non_user_tables() {
+function get_db_non_user_tables()
+{
     return [
         'survey_users' => array("created", "modified", "user_code", "email", "email_verified", "mobile_number", "mobile_verified"),
         'survey_run_sessions' => array("session", "created", "ended", "last_access", "position", "current_unit_id", "deactivated", "no_email"),
@@ -1867,32 +1998,37 @@ function get_db_non_user_tables() {
     ];
 }
 
-function get_db_non_session_tables() {
+function get_db_non_session_tables()
+{
     return ['survey_users', 'survey_run_sessions', 'survey_unit_sessions'];
 }
 
-function formr_check_maintenance() {
+function formr_check_maintenance()
+{
     $ip = env('REMOTE_ADDR');
-    
+
     if (Config::get('in_maintenance') && !in_array($ip, Config::get('maintenance_ips', []))) {
         formr_error(503, 'Service Unavailable', 'This website is currently undergoing maintenance. Please try again later.', 'Maintenance Mode', false);
     }
 }
 
-function formr_in_console() {
-	return php_sapi_name() === 'cli';
+function formr_in_console()
+{
+    return php_sapi_name() === 'cli';
 }
 
-function formr_search_highlight($search, $subject) {
-    return str_replace($search, '<span class="search-highlight">'.$search.'</span>', $subject);
+function formr_search_highlight($search, $subject)
+{
+    return str_replace($search, '<span class="search-highlight">' . $search . '</span>', $subject);
 }
 
 // Convert php.ini values to bytes
-function convertToBytes($value) {
+function convertToBytes($value)
+{
     $value = trim($value);
     $lastChar = strtolower($value[strlen($value) - 1]);
     $value = (int) $value;
-    
+
     switch ($lastChar) {
         case 'g':
             $value *= 1024;
@@ -1901,13 +2037,14 @@ function convertToBytes($value) {
         case 'k':
             $value *= 1024;
     }
-    
+
     return $value;
 }
 
 // check whether we're allowed to set anything but session cookies
-function gave_functional_cookie_consent() {
-    if(isset($_COOKIE['formrcookieconsent']) && strstr($_COOKIE['formrcookieconsent'], '"necessary","functionality"')) {
+function gave_functional_cookie_consent()
+{
+    if (isset($_COOKIE['formrcookieconsent']) && strstr($_COOKIE['formrcookieconsent'], '"necessary","functionality"')) {
         return true;
     }
     return false;
