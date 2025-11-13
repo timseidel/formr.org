@@ -111,24 +111,19 @@ class OAuthHelper
     }
 
     /**
-     * Get formr user object from API access token
+     * Get formr user object from email
      *
-     * @param string $access_token
+     * @param string $user_email
      * @return User|boolean If no corresponding user is found, FALSE is returned
      */
-    public function getUserByAccessToken($access_token)
-    {
-        if (!$access_token) {
+    public function getUserByEmail($user_email) {
+        if (!$user_email) {
             return false;
         }
-
         $db = Site::getDb();
-        $user_email = $db->findValue($this->config['access_token_table'], array('access_token' => $access_token), 'user_id');
         $user_id = $db->findValue('survey_users', array('email' => $user_email), 'id');
-        if (!$user_id) {
-            return false;
-        }
-        return new User($user_id, null);
+        formr_log($user_id);
+        return $user_id ? new User($user_id, null) : false;
     }
 
     /**

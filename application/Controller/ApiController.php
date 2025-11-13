@@ -149,8 +149,9 @@ class ApiController extends Controller {
     protected function doAction(Request $request, $action) {
         try {
             $this->authenticate($action); // only proceed if authenticated, if not exit via response
+            $token_data = $this->oauthServer->getAccessTokenData(OAuth2\Request::createFromGlobals());
             $method = $this->getPrivateAction($action, '-', true);
-            $helper = new ApiHelper($request, $this->fdb);
+            $helper = new ApiHelper($request, $this->fdb, $token_data);
             $data = $helper->{$method}()->getData();
         } catch (Exception $e) {
             formr_log_exception($e, 'API');
@@ -191,7 +192,7 @@ class ApiController extends Controller {
         if (!in_array($action, $this->unrestrictedActions)) {
             $this->oauthServer = Site::getOauthServer();
             // Handle a request to a resource and authenticate the access token
-            // Ex: curl https://formr.org/api/post/action-name -d 'access_token=YOUR_TOKEN'
+            // Ex: curl -H "Authorization: Bearer YOUR_TOKEN" https://formr.org/api/get/results
             if (!$this->oauthServer->verifyResourceRequest(OAuth2\Request::createFromGlobals())) {
                 $this->respond(Response::STATUS_UNAUTHORIZED, 'Unauthorized Access', array(
                     'error' => 'Invalid/Unauthorized access token',

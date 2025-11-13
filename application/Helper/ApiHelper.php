@@ -36,15 +36,15 @@ class ApiHelper {
      */
     protected $error = array();
 
-    public function __construct(Request $request, DB $db) {
+    public function __construct(Request $request, DB $db, $token_data) {
         $this->db = $db;
         $this->request = $request;
-        $this->user = OAuthHelper::getInstance()->getUserByAccessToken($this->request->getParam('access_token'));
+        $this->user = OAuthHelper::getInstance()->getUserByEmail($token_data['user_id']);
     }
 
     public function results() {
 		ini_set('memory_limit', Config::get('memory_limit.run_get_data'));
-		
+
         // Get run object from request
         $request_run = $this->request->arr('run');
         $request_surveys = $this->request->arr('surveys');
@@ -66,7 +66,7 @@ class ApiHelper {
         if (!($run = $this->getRunFromRequest($request))) {
             return $this;
         }
-        
+
         // If sessions are still not available then run is empty
         if (!$this->db->count('survey_run_sessions', array('run_id' => $run->id), 'id')) {
             $this->setData(Response::STATUS_NOT_FOUND, 'Empty Run', null, 'No sessions were found in this run.');
@@ -74,7 +74,7 @@ class ApiHelper {
         }
 
         $requested_run = $request->run;
-        
+
         // Determine which surveys in the run for which to collect data
         if (!empty($requested_run->survey)) {
             $surveys = array($requested_run->survey);
@@ -184,7 +184,7 @@ class ApiHelper {
      *
      * @param object $request A JSON object of the sent request
      * @return boolean|Run Returns a run object if a valid run is found or FALSE otherwise 
-     */
+     */ 
     protected function getRunFromRequest($request) {
         if (empty($request->run->name)) {
             $this->setData(Response::STATUS_NOT_FOUND, 'Not Found', null, 'Required "run : { name: }" parameter not found.');
@@ -203,7 +203,7 @@ class ApiHelper {
         return $run;
     }
 
-    private function setData($statusCode = null, $statusText = null, $response = null, $error = null) {
+    protected function setData($statusCode = null, $statusText = null, $response = null, $error = null) {
         if ($error !== null) {
             $this->setError($statusCode, $statusText, $error);
             return $this->setData($statusCode, $statusText, $this->error);
@@ -220,7 +220,7 @@ class ApiHelper {
         }
     }
 
-    private function setError($code = null, $error = null, $desc = null) {
+    protected function setError($code = null, $error = null, $desc = null) {
         if ($code !== null) {
             $this->error['error_code'] = $code;
         }
@@ -232,7 +232,7 @@ class ApiHelper {
         }
     }
 
-    private function parseJsonRequest() {
+    protected function parseJsonRequest() {
         $request = $this->request->str('request', null) ? $this->request->str('request') : file_get_contents('php://input');
         if (!$request) {
             $this->setData(Response::STATUS_BAD_REQUEST, 'Invalid Request', null, "Request payload not found");
@@ -246,7 +246,7 @@ class ApiHelper {
         return $object;
     }
   
-    private function getSurveyResults(Run $run, $survey_name, $survey_items = null, $sessions = null) {
+    protected function getSurveyResults(Run $run, $survey_name, $survey_items = null, $sessions = null) {
         $results = array();
         $query = $query = $this->buildSurveyResultsQuery($run, $survey_name, $survey_items, $sessions);
         $stmt = $this->db->query($query, true);
@@ -269,7 +269,7 @@ class ApiHelper {
         return array_values($results);
     }
 
-    private function buildSurveyResultsQuery(Run $run, $survey_name, $survey_items = null, $sessions = null) {
+    protected function buildSurveyResultsQuery(Run $run, $survey_name, $survey_items = null, $sessions = null) {
         $params = array(
             'run_id' => $run->id,
             'user_id' => $this->user->id,

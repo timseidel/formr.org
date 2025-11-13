@@ -71,10 +71,11 @@ generated error. An example of an error object is
 
 <h4>Making Resource Requests using generated access token</h4>
 
-With the generated access token, you are able to make requests to the resource endpoints of the formr API. For now only the results resource endpoint has 
-been implemented
+With the generated access token, you are able to make requests to the resource endpoints of the formr API. The access token should be sent in the `Authorization` header.
 
 <h5>Getting study results over the API</h5>
+
+<p>To obtain the results of a particular set of sessions in a particular run, send a GET HTTP request to the `get/results` endpoint. Include the access token in the `Authorization` header as a Bearer token.</p>
 
 <h6> REQUEST </h6>
 To obtain the results of a particular set of sessions in a particular run, send a GET HTTP request to the get endpoint along side the access_token obtained above 
@@ -83,8 +84,8 @@ together with the necessary parameters as shown below:
 <pre>
 <code class="http">
 GET /get/results?
-     access_token={access-token}
-    &amp;run[name]={name of the run as it appears on formr}
+     run[name]={name of the run as it appears on formr}
+    &amp;run[sessions]={comma separated list of session codes OR leave empty to get all sessions}
     &amp;run[sessions]={comma separated list of session codes OR leave empty to get all sessions}
     &amp;surveys[survey_name1]={comma separated list items to get from survey_name1 OR leave empty to get all items}
     &amp;surveys[survey_name2]={comma separated list items to get from survey_name2 OR leave empty to get all items}
@@ -92,6 +93,7 @@ GET /get/results?
 </pre>
 
 <p>
+    And include the following header: `Authorization: Bearer {access-token}`
     <b><i>Notes:</i></b><br />
 <ul>
     <li><i>survey_name1</i> and <i>survey_name2</i> should be the actual survey names</li>
@@ -147,20 +149,21 @@ request <- POST( # send POST request
 response <- content(request)
 access_token <- response$access_token
 
-#With a valid access token, call API to get the results of a particular study (run)
+# With a valid access token, call API to get the results of a particular study (run)
+# Set up the authorization header
+auth_header <- add_headers(Authorization = paste("Bearer", access_token))
+
+# Define the query parameters
 query <- list(
-  access_token = access_token,
   "run[name]" = "/enter run name here/",
   "run[session]" = "/here you can specify a full session code or just a substring(but include the beginning /",
   "surveys[survey_1]" = "item_1, item_2, item_etc.", # comma separated list of items to get from the survey or leave empty string to get all items
   "surveys[survey_2]" = "item_3, item_4, item_etc."
 )
-request <- GET("https://api.formr.org/get/results", query=query)
+request <- GET("https://api.formr.org/get/results", query = query, auth_header)
 results <- content(request)
 
 # With a valid response you can, for example, extract the results of a particular survey say 'survey_1':
 survey_1 = results$survey_1
 survey_1[, c("item_1","item_2")]
 </code></pre>
-
-
