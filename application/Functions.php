@@ -1077,6 +1077,47 @@ function opencpu_get($location, $return_format = 'json', $context = null, $retur
 }
 
 /**
+ * Prepares for an OpenCPU call that requires API authentication.
+ * If the R code contains 'formr_api_authenticate', it creates a temporary access token for the run owner.
+ *
+ * @param string $code The R code to inspect.
+ * @param array|null &$variables The array of variables to be passed to OpenCPU. This is passed by reference.
+ * @return string|null The temporary access token to be deleted after use, or null if no token was created.
+ */
+function opencpu_prepare_api_access($code, &$variables)
+{
+    if (strpos($code, 'formr_api_authenticate') === false) {
+        return null;
+    }
+
+    $run_session = run_session(); // Get the current run session
+    if (!$run_session) {
+        return null;
+    }
+
+    $run = $run_session->getRun();
+    $owner = $run->getOwner(); // Get the user object of the run owner
+
+    if (!$owner || !$owner->id) {
+        return null;
+    }
+
+    $oauth = OAuthHelper::getInstance();
+    $token_data = $oauth->createAccessTokenForUser($owner);
+
+    if (!$token_data || empty($token_data['access_token'])) {
+        return null;
+    }
+
+    if ($variables === null) {
+        $variables = [];
+    }
+    // Pass the owner's token to R as a variable.
+    $variables['access_token'] = "'" . $token_data['access_token'] . "'"; // The value must be quoted for R
+    return $token_data['access_token'];
+}
+
+/**
  * Execute a piece of code against OpenCPU
  *
  * @param string $code Each code line should be separated by a newline characted
@@ -1088,55 +1129,24 @@ function opencpu_get($location, $return_format = 'json', $context = null, $retur
  */
 function opencpu_evaluate($code, $variables = null, $return_format = 'json', $context = null, $return_session = false)
 {
-    if ($return_session !== true) {
-        $result = shortcut_without_opencpu($code, $variables);
-        if ($result !== null) {
-            return current($result);
-        }
+    if ($return_session !== true && ($result = shortcut_without_opencpu($code, $variables)) !== null) {
+        return current($result);
     }
 
-    $temp_token_to_delete = null;
-    // When R code contains formr_api_authenticate, create an access token for the run owner
-    if (strpos($code, 'formr_api_authenticate') !== false) {
-        $run_session = run_session(); // Get the current run session
-        if ($run_session) {
-            $run = $run_session->getRun();
-            $owner = $run->getOwner(); // Get the user object of the run owner
-            if ($owner && $owner->id) {
-                $oauth = OAuthHelper::getInstance();
-                $token_data = $oauth->createAccessTokenForUser($owner);
-                if ($token_data && !empty($token_data['access_token'])) {
-                    if ($variables === null) {
-                        $variables = [];
-                    }
-                    // Pass the owner's token to R as a variable.
-                    $variables['access_token'] = "'" . $token_data['access_token'] . "'"; // The value must be quoted for R
-                    $temp_token_to_delete = $token_data['access_token'];
-                }
-            }
-        }
-    }
+    $temp_token_to_delete = opencpu_prepare_api_access($code, $variables);
 
-    if (!is_string($variables)) {
-        $variables = opencpu_define_vars($variables, $context);
-    }
+    $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
 
-    $params = array('x' => '{ 
+    $params = ['x' => '{ 
 (function() {
 	library(formr)
-	' . $variables . '
+	' . $r_variables . '
 	' . $code . '
-})() }');
+})() }'];
 
     $uri = '/base/R/identity/' . $return_format;
     try {
         $session = OpenCPU::getInstance()->post($uri, $params);
-        if ($return_session === true) {
-            if ($temp_token_to_delete) {
-                OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
-            }
-            return $session;
-        }
 
         if ($session->hasError()) {
             throw new OpenCPU_Exception(opencpu_debug($session));
@@ -1144,18 +1154,15 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
             print_hidden_opencpu_debug_message($session, "OpenCPU debugger for run R code.");
         }
 
-        $result = $return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format);
-        if ($temp_token_to_delete) {
-            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
-        }
-        return $result;
+        return $return_session ? $session : ($return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format));
     } catch (OpenCPU_Exception $e) {
         notify_user_error($e, "There was a computational error.");
         opencpu_log($e);
+        return null;
+    } finally {
         if ($temp_token_to_delete) {
             OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
         }
-        return null;
     }
 }
 
