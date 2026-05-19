@@ -1337,8 +1337,22 @@ function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1
     $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
 
-    if ($r_variables) {
-        $source = "```{r, echo=FALSE, include=FALSE}\n" . $r_variables . "\n```\n" . $source;
+    // Only prepend when prepare_api_access actually augmented $variables
+    // with the .formr$ assignments (it does so only if the rendered R
+    // contains formr_api_authenticate(). All callers of knit2html are
+    // wrappers (knitdisplay / knitadmin / knit_email) that already bake
+    // the un-augmented $variables into their own settings chunk further
+    // down in $source — unconditional prepending was double-running them.
+    //
+    // library(formr) is added here because the .formr env (defined in
+    // formr::shorthands.R as `.formr <- new.env()`) is exported from
+    // formr's namespace, not auto-attached. Without an explicit attach
+    // before the .formr$x = ... lines, R errors with
+    // "object '.formr' not found" — the wrappers' own library(formr)
+    // calls live in their settings chunk further down and don't help
+    // this earlier chunk.
+    if ($temp_token_to_delete && $r_variables) {
+        $source = "```{r, echo=FALSE, include=FALSE}\nlibrary(formr)\n" . $r_variables . "\n```\n" . $source;
     }
 
     $params = array('text' => "'" . addslashes($source) . "'", 'self_contained' => $self_contained);
@@ -1346,11 +1360,22 @@ function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1
     try {
         $session = OpenCPU::getInstance()->post($uri, $params);
 
+        // Callers asking for the raw session expect to inspect ->hasError()
+        // themselves (e.g. RunUnit::getParsedBody distinguishes "server
+        // down" from "R error" by exactly this check). The hasError-throws
+        // branch below would erase that distinction by handing back null
+        // for R errors, which then surfaces as "OpenCPU is probably down"
+        // in the caller. Return early to preserve the session-or-null
+        // contract.
+        if ($return_session === true) {
+            return $session;
+        }
+
         if ($session->hasError()) {
             throw new OpenCPU_Exception(opencpu_debug($session));
         }
 
-        return $return_session ? $session : ($return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format));
+        return $return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format);
     } catch (OpenCPU_Exception $e) {
         notify_user_error($e, "There was a problem dynamically knitting something to HTML using openCPU.");
         opencpu_log($e);
