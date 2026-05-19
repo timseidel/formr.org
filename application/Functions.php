@@ -1410,6 +1410,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
 library(knitr); library(formr)
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
+```
 
 ' . $description . '
 
