@@ -1320,41 +1320,23 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 }
 
 /**
- * Knit R markdown to HTML using the formr_inline_render function from the formr R-Package.
- * This function can also handle internal API access by creating and using a temporary token
- * if `formr_api_authenticate()` is found in the R code.
+ * Knit R markdown to HTML via the formr_inline_render endpoint.
+ *
+ * Plain HTTP wrapper around the OpenCPU call. Variable injection and
+ * formr_api_authenticate() bridging are the caller's job — each of
+ * opencpu_knitdisplay / opencpu_knitadmin / opencpu_knit_email bakes
+ * its own settings chunk (with library(formr) + $variables) and runs
+ * opencpu_prepare_api_access before doing so, which is the only ordering
+ * where the injected .formr$ assignments can resolve.
  *
  * @param string $source The R Markdown source to be knitted.
- * @param string $return_format The desired output format from OpenCPU (e.g., 'json', 'html').
- * @param int $self_contained Flag to indicate if the output should be a self-contained HTML.
- * @param bool $return_session If true, the full OpenCPU_Session object is returned.
- * @param array|string|null $variables Variables to define in the R environment before knitting.
- * @param string|null $context The name of a dataframe to attach for easier variable access in R.
- * @return OpenCPU_Session|mixed|string|null The knitted output, the session object, or null on error.
+ * @param string $return_format Desired output format ('json' for the JSON object, otherwise raw $return_format).
+ * @param int $self_contained Passed through to rmarkdown::render.
+ * @param bool $return_session If true, returns the OpenCPU_Session as-is so the caller can inspect ->hasError() itself.
+ * @return OpenCPU_Session|mixed|string|null Knitted output, session, or null on error.
  */
-function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false, $variables = null, $context = null)
+function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false)
 {
-    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
-    $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
-
-    // Only prepend when prepare_api_access actually augmented $variables
-    // with the .formr$ assignments (it does so only if the rendered R
-    // contains formr_api_authenticate(). All callers of knit2html are
-    // wrappers (knitdisplay / knitadmin / knit_email) that already bake
-    // the un-augmented $variables into their own settings chunk further
-    // down in $source — unconditional prepending was double-running them.
-    //
-    // library(formr) is added here because the .formr env (defined in
-    // formr::shorthands.R as `.formr <- new.env()`) is exported from
-    // formr's namespace, not auto-attached. Without an explicit attach
-    // before the .formr$x = ... lines, R errors with
-    // "object '.formr' not found" — the wrappers' own library(formr)
-    // calls live in their settings chunk further down and don't help
-    // this earlier chunk.
-    if ($temp_token_to_delete && $r_variables) {
-        $source = "```{r, echo=FALSE, include=FALSE}\nlibrary(formr)\n" . $r_variables . "\n```\n" . $source;
-    }
-
     $params = array('text' => "'" . addslashes($source) . "'", 'self_contained' => $self_contained);
     $uri = '/formr/R/formr_inline_render/' . $return_format;
     try {
@@ -1362,11 +1344,8 @@ function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1
 
         // Callers asking for the raw session expect to inspect ->hasError()
         // themselves (e.g. RunUnit::getParsedBody distinguishes "server
-        // down" from "R error" by exactly this check). The hasError-throws
-        // branch below would erase that distinction by handing back null
-        // for R errors, which then surfaces as "OpenCPU is probably down"
-        // in the caller. Return early to preserve the session-or-null
-        // contract.
+        // down" from "R error" by exactly this check). Return early before
+        // the throw-on-error branch so a session-or-null contract is kept.
         if ($return_session === true) {
             return $session;
         }
@@ -1380,10 +1359,6 @@ function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1
         notify_user_error($e, "There was a problem dynamically knitting something to HTML using openCPU.");
         opencpu_log($e);
         return null;
-    } finally {
-        if ($temp_token_to_delete) {
-            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
-        }
     }
 }
 
@@ -1471,6 +1446,10 @@ opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',err
 
 function opencpu_knitdisplay($source, $variables = null, $return_session = false, $context = null)
 {
+    // Bridge formr_api_authenticate() before stringifying $variables so the
+    // .formr$ assignments land inside the settings chunk below, after
+    // library(formr) and before the user's chunks run.
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables, $context);
     }
@@ -1493,11 +1472,18 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' .
         $source;
 
-    return opencpu_knit2html($source, 'json', 0, $return_session, $variables, $context);
+    try {
+        return opencpu_knit2html($source, 'json', 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_knitadmin($source, $variables = null, $return_session = false)
 {
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1520,11 +1506,18 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' .
         $source;
 
-    return opencpu_knit2html($source, 'json', 0, $return_session, $variables);
+    try {
+        return opencpu_knit2html($source, 'json', 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_knit_email($source, array $variables = null, $return_format = 'json', $return_session = false)
 {
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1546,7 +1539,13 @@ opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' .
         $source;
 
-    return opencpu_knit2html($source, $return_format, 0, $return_session, $variables);
+    try {
+        return opencpu_knit2html($source, $return_format, 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_string_key($index)
