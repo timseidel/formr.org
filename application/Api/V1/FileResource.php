@@ -84,7 +84,18 @@ class FileResource extends BaseResource
         }
 
         $originalName = $_FILES['file']['name'];
+        // Strip path components, leading dots, and repeated dots before
+        // applying the charset filter. Path traversal is also blocked
+        // downstream by Run::uploadFiles's realpath-prefix check, but
+        // we don't want `..hidden.txt`, `....png`, or `.htaccess` to
+        // survive the sanitizer regardless.
+        $originalName = basename($originalName);
+        $originalName = ltrim($originalName, '.');
+        $originalName = preg_replace('/\.{2,}/', '.', $originalName);
         $sanitizedName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+        if ($sanitizedName === '' || $sanitizedName === '.') {
+            return $this->error(400, 'Invalid file name.');
+        }
 
         $filesPayload = [
             'name'     => [$sanitizedName],
