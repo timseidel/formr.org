@@ -309,6 +309,26 @@ class ApiController extends Controller
     {
         if (!in_array($action, $this->unrestrictedActions)) {
             $this->oauthServer = Site::getOauthServer();
+
+            // Enforce header-only bearer tokens. bshaffer's default
+            // BearerToken accepts access_token from the Authorization
+            // header, the request body (POST), AND the query string
+            // (`?access_token=…`). The body/URI paths leak the token
+            // into Apache access logs, Traefik logs, browser history,
+            // and HTTP Referrer headers, so the v1 work explicitly
+            // moved API clients onto the header (commit b17be066) —
+            // but the server side was never tightened to match. Reject
+            // here BEFORE verifyResourceRequest so a client that
+            // accidentally sends both header + query gets a clear 401
+            // pointing at the misuse rather than a silent acceptance
+            // of the URL token.
+            if (!empty($_GET['access_token']) || !empty($_POST['access_token'])) {
+                $this->respond(Response::STATUS_UNAUTHORIZED, 'Unauthorized', array(
+                    'code' => Response::STATUS_UNAUTHORIZED,
+                    'message' => 'access_token must be sent in the Authorization: Bearer <token> header, not in URL query string or request body',
+                ));
+            }
+
             // Handle a request to a resource and authenticate the access token
             // Ex: curl -H "Authorization: Bearer YOUR_TOKEN" https://formr.org/api/get/results
             if (!$this->oauthServer->verifyResourceRequest(OAuth2\Request::createFromGlobals())) {
