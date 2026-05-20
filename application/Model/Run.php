@@ -214,26 +214,23 @@ class Run extends Model
         return true;
     }
 
-    public function delete($force = false)
+    /**
+     * Cascade-delete the run: files, units (via deleteUnits() — sessions
+     * cascade via the schema's ON DELETE CASCADE FKs from those), then
+     * the survey_runs row itself. There's no "delete the run but keep
+     * the units" use case — orphaned units have no run to belong to.
+     *
+     * Safety is provided by each caller's own confirmation UX, NOT by
+     * this method:
+     *   - admin "Danger Zone → Delete run" requires typing the run name
+     *     to match (templates/admin/run/delete_run.php) and shows the
+     *     user-session count before the click.
+     *   - v1 API DELETE /v1/runs/<name> is an explicit HTTP DELETE.
+     *   - User::delete / User::carefulDelete are an account-deletion
+     *     cascade, already gated upstream.
+     */
+    public function delete()
     {
-        // Pre-d4e0059c this method relied on the FK constraint on
-        // survey_run_units (ON DELETE NO ACTION, schema.sql `fk_suru`)
-        // to bounce DELETE attempts when units still existed. d4e0059c
-        // added an unconditional deleteUnits() cascade, which made
-        // bulk wipes one-call but also removed the safeguard the admin
-        // "Danger Zone → Delete run" UI relied on. Make the cascade
-        // opt-in: callers that have already shown the user a confirmation
-        // (v1 API DELETE /v1/runs/<name>) pass $force=true; callers that
-        // shouldn't cascade silently (admin UI, user-deletion) leave it
-        // default and get the old "delete units first" behaviour back.
-        if (!$force) {
-            $unitCount = (int) $this->db->count('survey_run_units', array('run_id' => $this->id), 'id');
-            if ($unitCount > 0) {
-                alert(__("Could not delete run %s. This is probably because there are still run units present. For safety's sake you'll first need to delete each unit individually (or use 'Empty run').", $this->name), 'alert-danger');
-                return false;
-            }
-        }
-
         try {
             $this->deleteFiles();
             $this->deleteUnits();

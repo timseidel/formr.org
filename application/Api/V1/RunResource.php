@@ -291,11 +291,7 @@ class RunResource extends BaseResource
 
     private function deleteRun($run)
     {
-        // V1 DELETE /v1/runs/<name> is the explicit "tear this down"
-        // call. Pass $force=true to bypass Run::delete's unit-exists
-        // guard (which exists for the admin UI flow); the API caller
-        // owns the destructive intent.
-        if ($run->delete(true)) {
+        if ($run->delete()) {
             return $this->response(200, 'Run deleted successfully');
         } else {
             $errors = !empty($run->errors) ? implode('; ', $run->errors) : 'Unable to delete run';
