@@ -1395,8 +1395,15 @@ class Run extends Model
             // 2. Call the original import function.
             $imported = $this->importUnits($json_string);
 
-            if ($imported === false) {
-                throw new Exception("Import failed");
+            // Treat empty-array as failure too, not just false. importUnits
+            // returns [] when every unit in the payload was skipped by its
+            // own per-unit validation (e.g. missing `type` or `position`).
+            // Letting that commit would silently wipe the run structure
+            // (the DELETE above) and leave it empty — destructive on bogus
+            // input. The caller (StructureResource::importStructure) only
+            // surfaces a 500 after the destructive write has been durable.
+            if ($imported === false || (is_array($imported) && count($imported) === 0)) {
+                throw new Exception("Import produced no units; refusing to wipe run structure");
             }
 
             $this->db->commit();
