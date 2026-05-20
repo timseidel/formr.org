@@ -1110,9 +1110,20 @@ function opencpu_get($location, $return_format = 'json', $return_session = false
  */
 function opencpu_prepare_api_access($code, &$variables)
 {
-    // Match the actual call, not the bare identifier — a comment, docstring,
-    // or string literal containing "formr_api_authenticate" should not mint
-    // and immediately delete a one-shot OAuth token for nothing.
+    // Bridge participates in: opencpu_knit_iframe, opencpu_knit2html
+    // wrappers (knitdisplay / knitadmin / knit_email).
+    // NOT participating: opencpu_knit_plaintext / opencpu_evaluate.
+    // Plaintext rendering is for short string interpolation (email
+    // subjects, push titles, item label_parsed); live API authentication
+    // in those slots is a misuse — a `formr_api_authenticate()` call in
+    // an email subject won't have a place to put the result. The
+    // omission is deliberate; if an author hits this they should move
+    // the API call into the body chunk (knit_email path) instead.
+    //
+    // Match the actual call, not the bare identifier — a comment,
+    // docstring, or string literal containing "formr_api_authenticate"
+    // should not mint and immediately delete a one-shot OAuth token
+    // for nothing.
     if (!preg_match('/\bformr_api_authenticate\s*\(/', (string) $code)) {
         return null;
     }
