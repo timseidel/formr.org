@@ -245,6 +245,18 @@ class RunResource extends BaseResource
             return $this->error(400, 'Failed to update run: ' . $errors);
         }
 
+        // Run::saveSettings persists $updates with a DB UPDATE but does
+        // not refresh the in-memory Run instance. togglePublic below
+        // reads $this->expiresOn directly; without this re-sync a PATCH
+        // that sets expiresOn AND public=1 in the same call would see
+        // a stale (often null) expiry and reject the public flip with
+        // 'Cannot make a run public without an expiry'. Mirror what
+        // saveSettings just stored. (Previously fixed in e89779ea; the
+        // 208b9815 multi-file refactor dropped the refresh.)
+        if (array_key_exists('expiresOn', $input)) {
+            $run->expiresOn = $input['expiresOn'];
+        }
+
         // togglePublic / toggleLocked aren't on the run_settings
         // allowlist, so saveSettings doesn't touch them — they need
         // separate calls. Capture failures: togglePublic returns false
