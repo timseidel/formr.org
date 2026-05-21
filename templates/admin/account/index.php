@@ -398,7 +398,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     var $table = $panel.find('.api-credentials-list');
                                     var scopeHtml = sel.scope.length === 0
                                         ? '<em class="text-muted">none \u2014 token cannot access API</em>'
-                                        : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join('');
+                                        : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join(' ');
                                     var runHtml = sel.run_ids.length === 0
                                         ? '<em class="text-muted">all</em>'
                                         : sel.run_ids.length + ' selected';
