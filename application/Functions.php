@@ -820,6 +820,22 @@ function site_url($uri = '', $params = array())
     return $url;
 }
 
+function api_base_url()
+{
+    $protocol = Config::get('protocol', 'https://');
+    $domain = Config::get('api_domain', '');
+    if (empty($domain)) {
+        $domain = trim(Config::get('study_domain', ''), "*\/\\");
+    }
+    if (empty($domain)) {
+        $domain = Config::get('admin_domain', '');
+    }
+    if (empty($domain)) {
+        return rtrim(site_url('api'), '/');
+    }
+    return rtrim($protocol . $domain . '/api', '/');
+}
+
 function admin_url($uri = '', $params = array())
 {
     if ($uri) {
@@ -1179,7 +1195,7 @@ function opencpu_prepare_api_access($code, &$variables)
     // code. The R-side helpers (formr_api_authenticate, formr_api_results)
     // read these from `.formr$` as their auto-pickup source.
     $access_token = "'" . addcslashes($token_data['access_token'], "'\\") . "'";
-    $host = "'" . addcslashes(rtrim(site_url('api'), '/'), "'\\") . "'";
+    $host = "'" . addcslashes(api_base_url(), "'\\") . "'";
     $run_name = "'" . addcslashes($run->name, "'\\") . "'";
 
     if (is_string($variables)) {

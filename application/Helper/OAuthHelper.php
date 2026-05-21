@@ -97,10 +97,12 @@ class OAuthHelper
     public function createClient(User $formrUser, $label, array $scopes = [], array $runIds = [])
     {
         if (!$formrUser->canAccessApi()) {
+            error_log('OAuthHelper::createClient denied — user ' . $formrUser->id . ' cannot access API (admin level ' . $formrUser->admin . ')');
             return false;
         }
         $label = $this->validateLabel($label, false);
         if ($label === false) {
+            error_log('OAuthHelper::createClient label validation failed for user ' . $formrUser->id);
             return false;
         }
         return $this->createClientInternal($formrUser, $label, $scopes, $runIds);
@@ -324,10 +326,7 @@ class OAuthHelper
                 'label' => $label,
             ]);
         } catch (\Exception $e) {
-            // Most likely cause: UNIQUE(user_id, label) collision. Fail
-            // closed so the caller can surface the duplicate-label
-            // error from validateLabel's pre-flight (which checks the
-            // listing, not the index) before retrying.
+            error_log('OAuthHelper::createClientInternal INSERT failed for user ' . $formrUser->id . ' label "' . $label . '": ' . $e->getMessage());
             return false;
         }
 
@@ -340,8 +339,7 @@ class OAuthHelper
             $formrUser->email
         );
         if (!$ok) {
-            // Roll back the stub row so a failed setClientDetails
-            // doesn't leave an unusable record with empty secret.
+            error_log('OAuthHelper::createClientInternal setClientDetails failed for user ' . $formrUser->id . ' label "' . $label . '"');
             $db->delete($this->config['client_table'], ['client_id' => $details['client_id']]);
             return false;
         }
@@ -491,10 +489,11 @@ class OAuthHelper
         }
         $db = Site::getDb();
         $placeholders = implode(',', array_fill(0, count($scopes), '?'));
-        $stmt = $db->prepare("SELECT scope FROM {$this->config['scope_table']} WHERE scope IN ($placeholders)");
+        $stmt = $db->prepare("SELECT DISTINCT scope FROM {$this->config['scope_table']} WHERE scope IN ($placeholders)");
         $stmt->execute($scopes);
         $known = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
         if (count($known) !== count($scopes)) {
+            error_log('OAuthHelper::validateScopes failed. Submitted scopes: ' . implode(', ', $scopes) . ' | Known scopes: ' . implode(', ', $known));
             return false;
         }
         return $scopes;
@@ -522,6 +521,7 @@ class OAuthHelper
         $stmt->execute(array_merge([$formrUser->id], $runIds));
         $owned = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
         if (count($owned) !== count($runIds)) {
+            error_log('OAuthHelper::validateRunIds failed. Submitted run IDs: ' . implode(', ', $runIds) . ' | Owned by user ' . $formrUser->id . ': ' . implode(', ', $owned));
             return false;
         }
         return $runIds;
