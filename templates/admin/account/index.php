@@ -129,44 +129,46 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             <div id="api-credentials-panel"
                                  data-endpoint="<?= admin_url('account/api-credentials') ?>">
 
-                                <h4 class="lead" style="margin-top: 20px;">Your credentials</h4>
-                                <?php if (empty($api_credentials_list)): ?>
-                                    <p class="text-muted"><em>You have no API credentials yet. Create one below.</em></p>
-                                <?php else: ?>
-                                    <table class="table table-bordered api-credentials-list">
-                                        <thead>
-                                            <tr>
-                                                <th>Label</th>
-                                                <th>Client ID</th>
-                                                <th>Scopes</th>
-                                                <th>Runs</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                        <?php foreach ($api_credentials_list as $cred): ?>
-                                            <tr data-client-id="<?= h($cred['client_id']) ?>" data-label="<?= h($cred['label']) ?>" data-run-ids="<?= h(implode(',', $cred['run_ids'])) ?>">
-                                                <td><strong><?= h($cred['label']) ?></strong></td>
-                                                <td><code><?= h($cred['client_id']) ?></code></td>
-                                                <td>
-                                                    <?php if (empty($cred['scopes'])): ?>
-                                                        <em class="text-muted">none — token cannot access API</em>
-                                                    <?php else: ?>
-                                                        <?php foreach ($cred['scopes'] as $sc): ?>
-                                                            <code style="margin-right: 4px;"><?= h($sc) ?></code>
-                                                        <?php endforeach; ?>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td><?= empty($cred['run_ids']) ? '<em class="text-muted">all</em>' : count($cred['run_ids']) . ' selected' ?></td>
-                                                <td>
-                                                    <button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button>
-                                                    <button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                <?php endif; ?>
+                                <div id="api-credentials-list-wrap">
+                                    <h4 class="lead" style="margin-top: 20px;">Your credentials</h4>
+                                    <?php if (empty($api_credentials_list)): ?>
+                                        <p class="text-muted"><em>You have no API credentials yet. Create one below.</em></p>
+                                    <?php else: ?>
+                                        <table class="table table-bordered api-credentials-list">
+                                            <thead>
+                                                <tr>
+                                                    <th>Label</th>
+                                                    <th>Client ID</th>
+                                                    <th>Scopes</th>
+                                                    <th>Runs</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            <?php foreach ($api_credentials_list as $cred): ?>
+                                                <tr data-client-id="<?= h($cred['client_id']) ?>" data-label="<?= h($cred['label']) ?>" data-run-ids="<?= h(implode(',', $cred['run_ids'])) ?>">
+                                                    <td><strong><?= h($cred['label']) ?></strong></td>
+                                                    <td><code><?= h($cred['client_id']) ?></code></td>
+                                                    <td class="api-cred-scopes">
+                                                        <?php if (empty($cred['scopes'])): ?>
+                                                            <em class="text-muted">none — token cannot access API</em>
+                                                        <?php else: ?>
+                                                            <?php foreach ($cred['scopes'] as $sc): ?>
+                                                                <code style="margin-right: 4px;"><?= h($sc) ?></code>
+                                                            <?php endforeach; ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="api-cred-runs"><?= empty($cred['run_ids']) ? '<em class="text-muted">all</em>' : count($cred['run_ids']) . ' selected' ?></td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button>
+                                                        <button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    <?php endif; ?>
+                                </div>
 
                                 <div id="api-secret-once" class="hidden" style="margin-top: 20px;">
                                     <div class="alert alert-success" id="api-secret-success" style="margin-bottom: 10px;">
@@ -259,11 +261,11 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                                     <p class="text-muted"><em>You have no runs yet.</em></p>
                                                 <?php else: ?>
                                                     <select name="api_run_ids[]" multiple class="form-control" size="<?= min(8, max(3, count($user_runs))) ?>" style="width: 100%;">
-                                                         <?php foreach ($user_runs as $run_row): ?>
-                                                             <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
-                                                         <?php endforeach; ?>
-                                                     </select>
-                                                     <p class="help-block" style="margin-top: 4px;"><a href="#" class="api-clear-runs">Clear selection</a></p>
+                                                        <?php foreach ($user_runs as $run_row): ?>
+                                                            <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <p class="help-block" style="margin-top: 4px;"><a href="#" class="api-clear-runs">Clear selection</a></p>
                                                 <?php endif; ?>
                                             </fieldset>
                                         </div>
@@ -371,6 +373,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     return;
                                 }
                                 var wasCreate = (rotateClientId === null);
+                                var payload;
                                 if (wasCreate) {
                                     var label = jQuery.trim($labelInput.val());
                                     if (!label) {
@@ -411,7 +414,16 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     );
                                     $panel.find('#api-secret-once').removeClass('hidden');
 
-                                    var escAttr = function (s) { return jQuery('<div>').text(s).html(); };
+                                    // Escape for HTML element-and-attribute contexts. .text().html()
+                                    // misses ", which would break double-quoted attributes \u2014 so
+                                    // do the four substitutions explicitly.
+                                    var escAttr = function (s) {
+                                        return String(s)
+                                            .replace(/&/g, '&amp;')
+                                            .replace(/</g, '&lt;')
+                                            .replace(/>/g, '&gt;')
+                                            .replace(/"/g, '&quot;');
+                                    };
                                     var scopeHtml = sel.scope.length === 0
                                         ? '<em class="text-muted">none \u2014 token cannot access API</em>'
                                         : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join(' ');
@@ -425,16 +437,17 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                         var rowHtml = '<tr data-client-id="' + escAttr(response.data.client_id) + '" data-label="' + escAttr(response.data.label) + '" data-run-ids="' + escAttr(sel.run_ids.join(',')) + '">'
                                             + '<td><strong>' + escAttr(response.data.label) + '</strong></td>'
                                             + '<td><code>' + escAttr(response.data.client_id) + '</code></td>'
-                                            + '<td>' + scopeHtml + '</td>'
-                                            + '<td>' + runHtml + '</td>'
+                                            + '<td class="api-cred-scopes">' + scopeHtml + '</td>'
+                                            + '<td class="api-cred-runs">' + runHtml + '</td>'
                                             + '<td>'
                                             + '<button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button> '
                                             + '<button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>'
                                             + '</td>'
                                             + '</tr>';
                                         if ($table.length === 0) {
-                                            $panel.find('h4.lead:contains("Your credentials") ~ p.text-muted').remove();
-                                            $panel.find('h4.lead:contains("Your credentials")').after(
+                                            var $wrap = $panel.find('#api-credentials-list-wrap');
+                                            $wrap.find('p.text-muted').remove();
+                                            $wrap.append(
                                                 '<table class="table table-bordered api-credentials-list">'
                                                 + '<thead><tr><th>Label</th><th>Client ID</th><th>Scopes</th><th>Runs</th><th></th></tr></thead>'
                                                 + '<tbody>' + rowHtml + '</tbody>'
@@ -448,8 +461,8 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                         var $row = $panel.find('.api-credentials-list tr[data-client-id="' + escAttr(rotateClientId) + '"]');
                                         if ($row.length) {
                                             $row.attr('data-run-ids', sel.run_ids.join(','));
-                                            $row.find('td:eq(2)').html(scopeHtml);
-                                            $row.find('td:eq(3)').html(runHtml);
+                                            $row.find('.api-cred-scopes').html(scopeHtml);
+                                            $row.find('.api-cred-runs').html(runHtml);
                                         }
                                     }
                                     // Reset form back to create mode, keeping the secret visible
@@ -466,7 +479,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 var clientId = $row.data('client-id');
                                 var label = $row.data('label');
                                 // Pre-fetch the current scopes/runs from the row's badge column
-                                var scopes = $row.find('td:eq(2) code').map(function () { return jQuery(this).text(); }).get();
+                                var scopes = $row.find('.api-cred-scopes code').map(function () { return jQuery(this).text(); }).get();
                                 // The row only shows a count of runs, not the actual ids — leave runs unselected
                                 // and the user can re-pick. (Keeping the previous allowlist would require an extra
                                 // round-trip.)
