@@ -825,9 +825,6 @@ function api_base_url()
     $protocol = Config::get('protocol', 'https://');
     $domain = Config::get('api_domain', '');
     if (empty($domain)) {
-        $domain = trim(Config::get('study_domain', ''), "*\/\\");
-    }
-    if (empty($domain)) {
         $domain = Config::get('admin_domain', '');
     }
     if (empty($domain)) {
