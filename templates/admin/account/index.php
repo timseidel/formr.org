@@ -366,8 +366,8 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     && !confirm('You have not selected any scopes. A token with no scopes cannot access the API. Continue anyway?')) {
                                     return;
                                 }
-                                var payload;
-                                if (rotateClientId === null) {
+                                var wasCreate = (rotateClientId === null);
+                                if (wasCreate) {
                                     var label = jQuery.trim($labelInput.val());
                                     if (!label) {
                                         alert('Please pick a label for this credential.');
@@ -404,36 +404,41 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     $panel.find('.api-out-r-cmd').text(rCommand(response.data.client_id, response.data.client_secret));
                                     $panel.find('#api-secret-once').removeClass('hidden');
 
-                                    // Dynamically add the new row to the credentials table
-                                    var escAttr = function (s) { return jQuery('<div>').text(s).html(); };
-                                    var $table = $panel.find('.api-credentials-list');
-                                    var scopeHtml = sel.scope.length === 0
-                                        ? '<em class="text-muted">none \u2014 token cannot access API</em>'
-                                        : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join(' ');
-                                    var runHtml = sel.run_ids.length === 0
-                                        ? '<em class="text-muted">all</em>'
-                                        : sel.run_ids.length + ' selected';
-                                    var rowHtml = '<tr data-client-id="' + escAttr(response.data.client_id) + '" data-label="' + escAttr(response.data.label) + '">'
-                                        + '<td><strong>' + escAttr(response.data.label) + '</strong></td>'
-                                        + '<td><code>' + escAttr(response.data.client_id) + '</code></td>'
-                                        + '<td>' + scopeHtml + '</td>'
-                                        + '<td>' + runHtml + '</td>'
-                                        + '<td>'
-                                        + '<button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button> '
-                                        + '<button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>'
-                                        + '</td>'
-                                        + '</tr>';
-                                    if ($table.length === 0) {
-                                        $panel.find('h4.lead:contains("Your credentials") ~ p.text-muted').remove();
-                                        $panel.find('h4.lead:contains("Your credentials")').after(
-                                            '<table class="table table-bordered api-credentials-list">'
-                                            + '<thead><tr><th>Label</th><th>Client ID</th><th>Scopes</th><th>Runs</th><th></th></tr></thead>'
-                                            + '<tbody>' + rowHtml + '</tbody>'
-                                            + '</table>'
-                                        );
-                                    } else {
-                                        $table.find('tbody').prepend(rowHtml);
+                                    if (wasCreate) {
+                                        // Dynamically add the new row to the credentials table
+                                        var escAttr = function (s) { return jQuery('<div>').text(s).html(); };
+                                        var $table = $panel.find('.api-credentials-list');
+                                        var scopeHtml = sel.scope.length === 0
+                                            ? '<em class="text-muted">none \u2014 token cannot access API</em>'
+                                            : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join(' ');
+                                        var runHtml = sel.run_ids.length === 0
+                                            ? '<em class="text-muted">all</em>'
+                                            : sel.run_ids.length + ' selected';
+                                        var rowHtml = '<tr data-client-id="' + escAttr(response.data.client_id) + '" data-label="' + escAttr(response.data.label) + '">'
+                                            + '<td><strong>' + escAttr(response.data.label) + '</strong></td>'
+                                            + '<td><code>' + escAttr(response.data.client_id) + '</code></td>'
+                                            + '<td>' + scopeHtml + '</td>'
+                                            + '<td>' + runHtml + '</td>'
+                                            + '<td>'
+                                            + '<button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button> '
+                                            + '<button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>'
+                                            + '</td>'
+                                            + '</tr>';
+                                        if ($table.length === 0) {
+                                            $panel.find('h4.lead:contains("Your credentials") ~ p.text-muted').remove();
+                                            $panel.find('h4.lead:contains("Your credentials")').after(
+                                                '<table class="table table-bordered api-credentials-list">'
+                                                + '<thead><tr><th>Label</th><th>Client ID</th><th>Scopes</th><th>Runs</th><th></th></tr></thead>'
+                                                + '<tbody>' + rowHtml + '</tbody>'
+                                                + '</table>'
+                                            );
+                                        } else {
+                                            $table.find('tbody').prepend(rowHtml);
+                                        }
                                     }
+                                    // Reset form back to create mode, keeping the secret visible
+                                    enterCreateMode();
+                                    $panel.find('#api-secret-once').removeClass('hidden');
                                 }).fail(function () {
                                     alert('Request failed.');
                                     $submitBtn.prop('disabled', false);
