@@ -392,7 +392,37 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     $panel.find('.api-out-client-secret').text(response.data.client_secret);
                                     $panel.find('.api-out-r-cmd').text(rCommand(response.data.client_id, response.data.client_secret));
                                     $panel.find('#api-secret-once').removeClass('hidden');
-                                    reloadAfter(60000); // reload after a minute so the list refreshes
+
+                                    // Dynamically add the new row to the credentials table
+                                    var escAttr = function (s) { return jQuery('<div>').text(s).html(); };
+                                    var $table = $panel.find('.api-credentials-list');
+                                    var scopeHtml = sel.scope.length === 0
+                                        ? '<em class="text-muted">none \u2014 token cannot access API</em>'
+                                        : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join('');
+                                    var runHtml = sel.run_ids.length === 0
+                                        ? '<em class="text-muted">all</em>'
+                                        : sel.run_ids.length + ' selected';
+                                    var rowHtml = '<tr data-client-id="' + escAttr(response.data.client_id) + '" data-label="' + escAttr(response.data.label) + '">'
+                                        + '<td><strong>' + escAttr(response.data.label) + '</strong></td>'
+                                        + '<td><code>' + escAttr(response.data.client_id) + '</code></td>'
+                                        + '<td>' + scopeHtml + '</td>'
+                                        + '<td>' + runHtml + '</td>'
+                                        + '<td>'
+                                        + '<button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button> '
+                                        + '<button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>'
+                                        + '</td>'
+                                        + '</tr>';
+                                    if ($table.length === 0) {
+                                        $panel.find('h4.lead:contains("Your credentials") ~ p.text-muted').remove();
+                                        $panel.find('h4.lead:contains("Your credentials")').after(
+                                            '<table class="table table-bordered api-credentials-list">'
+                                            + '<thead><tr><th>Label</th><th>Client ID</th><th>Scopes</th><th>Runs</th><th></th></tr></thead>'
+                                            + '<tbody>' + rowHtml + '</tbody>'
+                                            + '</table>'
+                                        );
+                                    } else {
+                                        $table.find('tbody').prepend(rowHtml);
+                                    }
                                 }).fail(function () {
                                     alert('Request failed.');
                                     $submitBtn.prop('disabled', false);
