@@ -117,101 +117,111 @@ class SurveyResource extends BaseResource
             return $this->error(400, 'A valid file upload (key: "file") OR Google Sheet URL (key: "google_sheet") is required.');
         }
 
-        // Validate extension
-        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $allowed = ['xls', 'xlsx', 'ods', 'csv', 'txt', 'xml'];
-        if (!in_array(strtolower($ext), $allowed)) {
-            if ($googleSheetUrl) delete_tmp_file($file);
-            return $this->error(400, 'Invalid file type. Allowed: ' . implode(', ', $allowed));
-        }
-
-        $fileName = basename($file['name']);
-        $derivedName = preg_filter("/^([a-zA-Z][a-zA-Z0-9_]{2,64})(-[a-z0-9A-Z]+)?\.[a-z]{3,4}$/", "$1", $fileName);
-
-        if (!$derivedName) {
-            if ($googleSheetUrl) delete_tmp_file($file);
-            return $this->error(400, "Invalid file name. It must match the pattern for survey names (alphanumeric, 3-64 chars).");
-        }
-
-        $surveyName = $derivedName;
-
+        // Single try/finally so Google-Sheet tmp files get cleaned up on
+        // every exit path (validation early-return, run-restriction 403,
+        // upload failure, generic catch). The previous shape repeated
+        // `if ($googleSheetUrl) delete_tmp_file($file);` at each branch
+        // and missed the path where uploadItems itself threw before the
+        // happy-path delete ran.
         try {
-            $this->db->beginTransaction();
-
-            $study = SurveyStudy::loadByUserAndName($this->user, $surveyName);
-
-            // Run-restriction gate: blocks creating brand-new surveys
-            // (they'd be unreachable through the allowlist until linked
-            // into a run) and blocks updating surveys that don't appear
-            // in any of the client's allowlisted runs.
-            if ($study->valid) {
-                if (!$this->clientMayAccessSurvey((int) $study->id)) {
-                    $this->db->rollBack();
-                    if ($googleSheetUrl) delete_tmp_file($file);
-                    return $this->error(403, "This API client is not authorized for survey '$surveyName'.");
-                }
-            } elseif (!empty($this->allowedRunIds())) {
-                $this->db->rollBack();
-                if ($googleSheetUrl) delete_tmp_file($file);
-                return $this->error(
-                    403,
-                    "Cannot create surveys with a run-restricted API client; "
-                    . "add the survey to a run via the admin UI first, then update it via the API."
-                );
+            // Validate extension
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $allowed = ['xls', 'xlsx', 'ods', 'csv', 'txt', 'xml'];
+            if (!in_array(strtolower($ext), $allowed)) {
+                return $this->error(400, 'Invalid file type. Allowed: ' . implode(', ', $allowed));
             }
 
-            $options = [
-                'user_id' => $this->user->id,
-                'survey_name' => $surveyName
-            ];
+            // Accept `<name>.<ext>` or `<name>-<version>.<ext>` (e.g.
+            // `mood-v2.xlsx`); the optional `-<version>` suffix is stripped
+            // by the capture group so versioned re-uploads resolve to the
+            // same surveyName. `<name>` itself is 1 leading alpha + 2..64
+            // alphanumerics, i.e. 3..65 chars total.
+            $fileName = basename($file['name']);
+            $derivedName = preg_filter("/^([a-zA-Z][a-zA-Z0-9_]{2,64})(-[a-z0-9A-Z]+)?\.[a-z]{3,4}$/", "$1", $fileName);
 
-            if ($study->valid) {
-                if ($googleSheetUrl && isset($file['google_file_id'])) {
-                    if ($study->google_file_id != $file['google_file_id']) {
+            if (!$derivedName) {
+                return $this->error(400, "Invalid file name. It must match the pattern <name>[-<version>].<ext> where <name> is 3-65 alphanumerics starting with a letter and <ext> is xlsx/xls/csv.");
+            }
+
+            $surveyName = $derivedName;
+
+            try {
+                $this->db->beginTransaction();
+
+                $study = SurveyStudy::loadByUserAndName($this->user, $surveyName);
+
+                // Run-restriction gate: blocks creating brand-new surveys
+                // (they'd be unreachable through the allowlist until linked
+                // into a run) and blocks updating surveys that don't appear
+                // in any of the client's allowlisted runs.
+                if ($study->valid) {
+                    if (!$this->clientMayAccessSurvey((int) $study->id)) {
+                        $this->db->rollBack();
+                        return $this->error(403, "This API client is not authorized for survey '$surveyName'.");
+                    }
+                } elseif (!empty($this->allowedRunIds())) {
+                    $this->db->rollBack();
+                    return $this->error(
+                        403,
+                        "Cannot create surveys with a run-restricted API client; "
+                        . "add the survey to a run via the admin UI first, then update it via the API."
+                    );
+                }
+
+                $options = [
+                    'user_id' => $this->user->id,
+                    'survey_name' => $surveyName
+                ];
+
+                if ($study->valid) {
+                    if ($googleSheetUrl && isset($file['google_file_id'])) {
+                        if ($study->google_file_id != $file['google_file_id']) {
+                            $study->google_file_id = $file['google_file_id'];
+                            $study->save();
+                        }
+                    }
+
+                    $success = $study->uploadItems($file, true);
+                    $action = 'updated';
+                } else {
+                    $study = new SurveyStudy();
+                    if (!$study->createFromFile($file, $options)) {
+                        throw new Exception("Failed to initialize survey structure.");
+                    }
+
+                    if ($googleSheetUrl && isset($file['google_file_id'])) {
                         $study->google_file_id = $file['google_file_id'];
                         $study->save();
                     }
+
+                    $success = $study->uploadItems($file, true, true);
+                    $action = 'created';
                 }
 
-                $success = $study->uploadItems($file, true);
-                $action = 'updated';
-            } else {
-                $study = new SurveyStudy();
-                if (!$study->createFromFile($file, $options)) {
-                    throw new Exception("Failed to initialize survey structure.");
-                }
+                if ($success) {
+                    $this->db->commit();
+                    $messages = array_merge($study->messages, $study->warnings);
 
-                if ($googleSheetUrl && isset($file['google_file_id'])) {
-                    $study->google_file_id = $file['google_file_id'];
-                    $study->save();
+                    return $this->response(
+                        $action === 'created' ? 201 : 200,
+                        "Survey successfully $action.",
+                        [
+                            'id' => (int)$study->id,
+                            'name' => $study->name,
+                            'logs' => $messages
+                        ]
+                    );
+                } else {
+                    throw new Exception(implode("; ", $study->errors));
                 }
-
-                $success = $study->uploadItems($file, true, true);
-                $action = 'created';
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                return $this->error(500, 'Processing failed: ' . $e->getMessage());
             }
-
-            if ($success) {
-                $this->db->commit();
-                $messages = array_merge($study->messages, $study->warnings);
-
-                if ($googleSheetUrl) delete_tmp_file($file);
-
-                return $this->response(
-                    $action === 'created' ? 201 : 200,
-                    "Survey successfully $action.",
-                    [
-                        'id' => (int)$study->id,
-                        'name' => $study->name,
-                        'logs' => $messages
-                    ]
-                );
-            } else {
-                throw new Exception(implode("; ", $study->errors));
+        } finally {
+            if ($googleSheetUrl && $file) {
+                delete_tmp_file($file);
             }
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            if ($googleSheetUrl) delete_tmp_file($file);
-            return $this->error(500, 'Processing failed: ' . $e->getMessage());
         }
     }
 

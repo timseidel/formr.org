@@ -46,6 +46,15 @@ test.describe('API scoping', () => {
     test.skip(!ENV_OK, 'FORMR_DEV_URL / FORMR_DEV_ADMIN_EMAIL / FORMR_DEV_ADMIN_PASSWORD not set in .env.dev; skipping');
 
     let runAId, runBId;
+    // Labels for credentials created during this run, so afterAll can
+    // clean them up via the admin UI's delete button. Without this,
+    // the dev user's API tab fills up with one row per test invocation.
+    const labelsToCleanup = new Set();
+    function uniqueLabel(stem) {
+        const lbl = `e2e-scope-${stem}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        labelsToCleanup.add(lbl);
+        return lbl;
+    }
 
     test.beforeAll(async ({ browser }) => {
         const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -64,6 +73,35 @@ test.describe('API scoping', () => {
 
         test.skip(!runAId || !runBId,
             `scoping fixtures ${RUN_A} and ${RUN_B} not found; run tests/APIV1_bruno_tests/run_security.sh once to seed them`);
+    });
+
+    // Delete every credential this run created, so the dev user's API
+    // tab doesn't accumulate e2e-scope-* rows across CI / local runs.
+    // Best-effort: a single failed click shouldn't fail the whole suite.
+    test.afterAll(async ({ browser }) => {
+        if (labelsToCleanup.size === 0) return;
+        const ctx = await browser.newContext({
+            storageState: 'tests/e2e/setup/api-scoping-state.json',
+            ignoreHTTPSErrors: true,
+        });
+        const page = await ctx.newPage();
+        page.on('dialog', d => d.accept()); // delete-confirm modal
+        try {
+            await page.goto(`${ADMIN_URL}/admin/account/#api`, { waitUntil: 'domcontentloaded' });
+            for (const label of labelsToCleanup) {
+                const row = page.locator(`tr[data-label="${label}"]`);
+                if ((await row.count()) === 0) continue;
+                await row.locator('.api-delete-btn').click();
+                // The row removal is racy with the next iteration's count();
+                // wait for it to detach before moving on.
+                await row.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn(`[api-scoping] cleanup failed: ${e.message}`);
+        } finally {
+            await ctx.close();
+        }
     });
 
     // --- helpers ---------------------------------------------------------
@@ -97,7 +135,14 @@ test.describe('API scoping', () => {
         expect(page.url()).toContain('/admin');
     }
 
-    async function issueCredentials(browser, scopes, runIds) {
+    // Drive the labelled-credentials UI added in dc2a4259. If a row
+    // with this label already exists, click its .api-rotate-btn to put
+    // the form into rotate-mode for that client_id; otherwise fill the
+    // label input and let the submit run in create-mode. Either way the
+    // submit goes to the same #api-create-btn (which doubles as the
+    // rotate trigger after enterRotateMode runs — see the JS in
+    // templates/admin/account/index.php around line 303).
+    async function issueCredentials(browser, scopes, runIds, label) {
         const ctx = await browser.newContext({
             storageState: 'tests/e2e/setup/api-scoping-state.json',
             ignoreHTTPSErrors: true,
@@ -105,12 +150,26 @@ test.describe('API scoping', () => {
         const page = await ctx.newPage();
         await page.goto(`${ADMIN_URL}/admin/account/#api`);
 
-        // Listen for the alert that fires when we ask "no scopes? continue?"
-        // and dismiss any unrelated confirm. Always click "yes" because we
-        // explicitly want to proceed.
+        // Listen for the "Rotating will invalidate the current secret"
+        // confirm, the "no scopes? continue?" alert, etc. — always accept.
         page.on('dialog', d => d.accept());
 
+        // If a row with this label is already in the table, switch the
+        // form into rotate mode by clicking that row's rotate button.
+        // This re-uses the existing client_id and only mints a new
+        // secret — which is what the "Rotating invalidates the old
+        // secret" test asserts.
+        const existingRow = page.locator(`tr[data-label="${label}"]`);
+        const rotating = (await existingRow.count()) > 0;
+        if (rotating) {
+            await existingRow.locator('.api-rotate-btn').click();
+        } else {
+            await page.fill('#api-label-input', label);
+        }
+
         // Uncheck every scope first, then check the ones we want.
+        // (enterRotateMode pre-ticks the row's scopes, but we want a
+        // deterministic set whichever path got us here.)
         const allScopes = await page.locator('input[name="api_scope[]"]').all();
         for (const cb of allScopes) {
             if (await cb.isChecked()) await cb.uncheck();
@@ -127,17 +186,12 @@ test.describe('API scoping', () => {
             await select.selectOption([]);
         }
 
-        // Either rotate (if a client already exists) or create.
-        const rotateBtn = page.locator('#api-rotate-btn');
-        const createBtn = page.locator('#api-create-btn');
+        // Submit. The button id is stable across create + rotate modes;
+        // the JS swaps its label text only.
         const responsePromise = page.waitForResponse(
             r => r.url().includes('/admin/account/api-credentials') && r.request().method() === 'POST'
         );
-        if (await rotateBtn.isVisible()) {
-            await rotateBtn.click();
-        } else {
-            await createBtn.click();
-        }
+        await page.click('#api-create-btn');
         const response = await responsePromise;
         const json = await response.json();
         expect(json.success, JSON.stringify(json)).toBe(true);
@@ -170,7 +224,7 @@ test.describe('API scoping', () => {
     // --- tests -----------------------------------------------------------
 
     test('Read-only token allows GET, denies PATCH on allowlisted run', async ({ browser }) => {
-        const creds = await issueCredentials(browser, ['run:read'], [runAId]);
+        const creds = await issueCredentials(browser, ['run:read'], [runAId], uniqueLabel('readonly'));
         const { token, scope } = await mintToken(creds);
         expect(scope).toBe('run:read');
 
@@ -188,7 +242,7 @@ test.describe('API scoping', () => {
     });
 
     test('Run-allowlisted token cannot reach other runs or their surveys', async ({ browser }) => {
-        const creds = await issueCredentials(browser, ['run:read', 'run:write', 'survey:read'], [runAId]);
+        const creds = await issueCredentials(browser, ['run:read', 'run:write', 'survey:read'], [runAId], uniqueLabel('runallow'));
         const { token } = await mintToken(creds);
         const api = await bearer(token);
 
@@ -221,7 +275,7 @@ test.describe('API scoping', () => {
     });
 
     test('Unrestricted token (empty allowlist) sees everything user owns', async ({ browser }) => {
-        const creds = await issueCredentials(browser, ['run:read', 'survey:read'], []);
+        const creds = await issueCredentials(browser, ['run:read', 'survey:read'], [], uniqueLabel('unrestricted'));
         const { token } = await mintToken(creds);
         const api = await bearer(token);
 
@@ -230,8 +284,12 @@ test.describe('API scoping', () => {
     });
 
     test('Rotating invalidates the old secret', async ({ browser }) => {
-        const first = await issueCredentials(browser, ['run:read'], [runAId]);
-        const second = await issueCredentials(browser, ['run:read'], [runAId]);
+        const rotateLabel = uniqueLabel('rotate');
+        const first = await issueCredentials(browser, ['run:read'], [runAId], rotateLabel);
+        // Second call with the SAME label drives the rotate branch of
+        // issueCredentials, which clicks .api-rotate-btn for the row
+        // matching this label and then submits in rotate-mode.
+        const second = await issueCredentials(browser, ['run:read'], [runAId], rotateLabel);
         expect(second.clientId).toBe(first.clientId);
         expect(second.clientSecret).not.toBe(first.clientSecret);
 

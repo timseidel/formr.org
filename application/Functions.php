@@ -1110,9 +1110,20 @@ function opencpu_get($location, $return_format = 'json', $return_session = false
  */
 function opencpu_prepare_api_access($code, &$variables)
 {
-    // Match the actual call, not the bare identifier — a comment, docstring,
-    // or string literal containing "formr_api_authenticate" should not mint
-    // and immediately delete a one-shot OAuth token for nothing.
+    // Bridge participates in: opencpu_knit_iframe, opencpu_knit2html
+    // wrappers (knitdisplay / knitadmin / knit_email).
+    // NOT participating: opencpu_knit_plaintext / opencpu_evaluate.
+    // Plaintext rendering is for short string interpolation (email
+    // subjects, push titles, item label_parsed); live API authentication
+    // in those slots is a misuse — a `formr_api_authenticate()` call in
+    // an email subject won't have a place to put the result. The
+    // omission is deliberate; if an author hits this they should move
+    // the API call into the body chunk (knit_email path) instead.
+    //
+    // Match the actual call, not the bare identifier — a comment,
+    // docstring, or string literal containing "formr_api_authenticate"
+    // should not mint and immediately delete a one-shot OAuth token
+    // for nothing.
     if (!preg_match('/\bformr_api_authenticate\s*\(/', (string) $code)) {
         return null;
     }
@@ -1320,45 +1331,45 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 }
 
 /**
- * Knit R markdown to HTML using the formr_inline_render function from the formr R-Package.
- * This function can also handle internal API access by creating and using a temporary token
- * if `formr_api_authenticate()` is found in the R code.
+ * Knit R markdown to HTML via the formr_inline_render endpoint.
+ *
+ * Plain HTTP wrapper around the OpenCPU call. Variable injection and
+ * formr_api_authenticate() bridging are the caller's job — each of
+ * opencpu_knitdisplay / opencpu_knitadmin / opencpu_knit_email bakes
+ * its own settings chunk (with library(formr) + $variables) and runs
+ * opencpu_prepare_api_access before doing so, which is the only ordering
+ * where the injected .formr$ assignments can resolve.
  *
  * @param string $source The R Markdown source to be knitted.
- * @param string $return_format The desired output format from OpenCPU (e.g., 'json', 'html').
- * @param int $self_contained Flag to indicate if the output should be a self-contained HTML.
- * @param bool $return_session If true, the full OpenCPU_Session object is returned.
- * @param array|string|null $variables Variables to define in the R environment before knitting.
- * @param string|null $context The name of a dataframe to attach for easier variable access in R.
- * @return OpenCPU_Session|mixed|string|null The knitted output, the session object, or null on error.
+ * @param string $return_format Desired output format ('json' for the JSON object, otherwise raw $return_format).
+ * @param int $self_contained Passed through to rmarkdown::render.
+ * @param bool $return_session If true, returns the OpenCPU_Session as-is so the caller can inspect ->hasError() itself.
+ * @return OpenCPU_Session|mixed|string|null Knitted output, session, or null on error.
  */
-function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false, $variables = null, $context = null)
+function opencpu_knit2html($source, $return_format = 'json', $self_contained = 1, $return_session = false)
 {
-    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
-    $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
-
-    if ($r_variables) {
-        $source = "```{r, echo=FALSE, include=FALSE}\n" . $r_variables . "\n```\n" . $source;
-    }
-
     $params = array('text' => "'" . addslashes($source) . "'", 'self_contained' => $self_contained);
     $uri = '/formr/R/formr_inline_render/' . $return_format;
     try {
         $session = OpenCPU::getInstance()->post($uri, $params);
 
+        // Callers asking for the raw session expect to inspect ->hasError()
+        // themselves (e.g. RunUnit::getParsedBody distinguishes "server
+        // down" from "R error" by exactly this check). Return early before
+        // the throw-on-error branch so a session-or-null contract is kept.
+        if ($return_session === true) {
+            return $session;
+        }
+
         if ($session->hasError()) {
             throw new OpenCPU_Exception(opencpu_debug($session));
         }
 
-        return $return_session ? $session : ($return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format));
+        return $return_format === 'json' ? $session->getJSONObject() : $session->getObject($return_format);
     } catch (OpenCPU_Exception $e) {
         notify_user_error($e, "There was a problem dynamically knitting something to HTML using openCPU.");
         opencpu_log($e);
         return null;
-    } finally {
-        if ($temp_token_to_delete) {
-            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
-        }
     }
 }
 
@@ -1410,6 +1421,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
 library(knitr); library(formr)
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
+```
 
 ' . $description . '
 
@@ -1445,6 +1457,10 @@ opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',err
 
 function opencpu_knitdisplay($source, $variables = null, $return_session = false, $context = null)
 {
+    // Bridge formr_api_authenticate() before stringifying $variables so the
+    // .formr$ assignments land inside the settings chunk below, after
+    // library(formr) and before the user's chunks run.
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables, $context);
     }
@@ -1467,11 +1483,18 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' .
         $source;
 
-    return opencpu_knit2html($source, 'json', 0, $return_session, $variables, $context);
+    try {
+        return opencpu_knit2html($source, 'json', 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_knitadmin($source, $variables = null, $return_session = false)
 {
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1494,11 +1517,18 @@ opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' .
         $source;
 
-    return opencpu_knit2html($source, 'json', 0, $return_session, $variables);
+    try {
+        return opencpu_knit2html($source, 'json', 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_knit_email($source, array $variables = null, $return_format = 'json', $return_session = false)
 {
+    $temp_token_to_delete = opencpu_prepare_api_access($source, $variables);
     if (!is_string($variables)) {
         $variables = opencpu_define_vars($variables);
     }
@@ -1520,7 +1550,13 @@ opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' .
         $source;
 
-    return opencpu_knit2html($source, $return_format, 0, $return_session, $variables);
+    try {
+        return opencpu_knit2html($source, $return_format, 0, $return_session);
+    } finally {
+        if ($temp_token_to_delete) {
+            OAuthHelper::getInstance()->deleteAccessToken($temp_token_to_delete);
+        }
+    }
 }
 
 function opencpu_string_key($index)

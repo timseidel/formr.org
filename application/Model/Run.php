@@ -214,11 +214,25 @@ class Run extends Model
         return true;
     }
 
+    /**
+     * Cascade-delete the run: files, units (via deleteUnits() — sessions
+     * cascade via the schema's ON DELETE CASCADE FKs from those), then
+     * the survey_runs row itself. There's no "delete the run but keep
+     * the units" use case — orphaned units have no run to belong to.
+     *
+     * Safety is provided by each caller's own confirmation UX, NOT by
+     * this method:
+     *   - admin "Danger Zone → Delete run" requires typing the run name
+     *     to match (templates/admin/run/delete_run.php) and shows the
+     *     user-session count before the click.
+     *   - v1 API DELETE /v1/runs/<name> is an explicit HTTP DELETE.
+     *   - User::delete / User::carefulDelete are an account-deletion
+     *     cascade, already gated upstream.
+     */
     public function delete()
     {
         try {
             $this->deleteFiles();
-            // Need to discuss: Should this cascade the run-unit deletions?
             $this->deleteUnits();
 
             $this->db->delete('survey_runs', array('id' => $this->id));
@@ -1395,8 +1409,15 @@ class Run extends Model
             // 2. Call the original import function.
             $imported = $this->importUnits($json_string);
 
-            if ($imported === false) {
-                throw new Exception("Import failed");
+            // Treat empty-array as failure too, not just false. importUnits
+            // returns [] when every unit in the payload was skipped by its
+            // own per-unit validation (e.g. missing `type` or `position`).
+            // Letting that commit would silently wipe the run structure
+            // (the DELETE above) and leave it empty — destructive on bogus
+            // input. The caller (StructureResource::importStructure) only
+            // surfaces a 500 after the destructive write has been durable.
+            if ($imported === false || (is_array($imported) && count($imported) === 0)) {
+                throw new Exception("Import produced no units; refusing to wipe run structure");
             }
 
             $this->db->commit();
