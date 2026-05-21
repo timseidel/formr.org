@@ -145,7 +145,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                         </thead>
                                         <tbody>
                                         <?php foreach ($api_credentials_list as $cred): ?>
-                                            <tr data-client-id="<?= h($cred['client_id']) ?>" data-label="<?= h($cred['label']) ?>">
+                                            <tr data-client-id="<?= h($cred['client_id']) ?>" data-label="<?= h($cred['label']) ?>" data-run-ids="<?= h(implode(',', $cred['run_ids'])) ?>">
                                                 <td><strong><?= h($cred['label']) ?></strong></td>
                                                 <td><code><?= h($cred['client_id']) ?></code></td>
                                                 <td>
@@ -169,6 +169,9 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 <?php endif; ?>
 
                                 <div id="api-secret-once" class="hidden" style="margin-top: 20px;">
+                                    <div class="alert alert-success" id="api-secret-success" style="margin-bottom: 10px;">
+                                        <strong>Credential created successfully.</strong>
+                                    </div>
                                     <div class="alert alert-warning">
                                         <strong>One-time display.</strong> Copy the client secret now — we only store a hash, so it cannot be recovered later.
                                     </div>
@@ -188,7 +191,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     </table>
                                 </div>
 
-                                <h4 class="lead" style="margin-top: 30px;">Create a new credential</h4>
+                                <h4 id="api-form-heading" class="lead" style="margin-top: 30px;">Create a new credential</h4>
                                 <div class="api-form" data-form-mode="create">
                                     <div class="row">
                                         <div class="col-md-8">
@@ -256,10 +259,11 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                                     <p class="text-muted"><em>You have no runs yet.</em></p>
                                                 <?php else: ?>
                                                     <select name="api_run_ids[]" multiple class="form-control" size="<?= min(8, max(3, count($user_runs))) ?>" style="width: 100%;">
-                                                        <?php foreach ($user_runs as $run_row): ?>
-                                                            <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
+                                                         <?php foreach ($user_runs as $run_row): ?>
+                                                             <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
+                                                         <?php endforeach; ?>
+                                                     </select>
+                                                     <p class="help-block" style="margin-top: 4px;"><a href="#" class="api-clear-runs">Clear selection</a></p>
                                                 <?php endif; ?>
                                             </fieldset>
                                         </div>
@@ -298,6 +302,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             var $submitLabel = $panel.find('.api-submit-label');
                             var $cancelBtn = $panel.find('#api-cancel-rotate-btn');
                             var $labelInput = $panel.find('#api-label-input');
+                            var $formHeading = $panel.find('#api-form-heading');
                             // rotate state — when non-null the form submits a rotate
                             // for this client_id (label is fixed and disabled).
                             var rotateClientId = null;
@@ -328,6 +333,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 $submitLabel.text('Create credential');
                                 $submitBtn.removeClass('btn-warning').addClass('btn-primary');
                                 $cancelBtn.hide();
+                                $formHeading.text('Create a new credential');
                                 $form.find('input[name="api_scope[]"]').prop('checked', false);
                                 $panel.find('#api-scope-select-all').prop('checked', false);
                                 $form.find('select[name="api_run_ids[]"] option:selected').prop('selected', false);
@@ -342,6 +348,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 $submitLabel.text('Rotate secret for "' + label + '"');
                                 $submitBtn.removeClass('btn-primary').addClass('btn-warning');
                                 $cancelBtn.show();
+                                $formHeading.text('Rotate credential');
                                 $form.find('input[name="api_scope[]"]').each(function () {
                                     this.checked = scopes.indexOf(this.value) !== -1;
                                 });
@@ -363,11 +370,19 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     && !confirm('You have not selected any scopes. A token with no scopes cannot access the API. Continue anyway?')) {
                                     return;
                                 }
-                                var payload;
-                                if (rotateClientId === null) {
+                                var wasCreate = (rotateClientId === null);
+                                if (wasCreate) {
                                     var label = jQuery.trim($labelInput.val());
                                     if (!label) {
                                         alert('Please pick a label for this credential.');
+                                        return;
+                                    }
+                                    var existingLabels = $panel.find('.api-credentials-list tbody tr').map(function () {
+                                        return jQuery(this).data('label');
+                                    }).get();
+                                    if (existingLabels.some(function (l) { return l.toLowerCase() === label.toLowerCase(); })) {
+                                        alert('You already have a credential with the label "' + label + '". Each label must be unique within your account.');
+                                        $submitBtn.prop('disabled', false);
                                         return;
                                     }
                                     payload = jQuery.extend({ api_action: 'create', label: label }, sel);
@@ -391,8 +406,55 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     $panel.find('.api-out-client-id').text(response.data.client_id);
                                     $panel.find('.api-out-client-secret').text(response.data.client_secret);
                                     $panel.find('.api-out-r-cmd').text(rCommand(response.data.client_id, response.data.client_secret));
+                                    $panel.find('#api-secret-success').text(
+                                        wasCreate ? 'Credential created successfully.' : 'Secret rotated successfully. The old secret is now invalid.'
+                                    );
                                     $panel.find('#api-secret-once').removeClass('hidden');
-                                    reloadAfter(60000); // reload after a minute so the list refreshes
+
+                                    var escAttr = function (s) { return jQuery('<div>').text(s).html(); };
+                                    var scopeHtml = sel.scope.length === 0
+                                        ? '<em class="text-muted">none \u2014 token cannot access API</em>'
+                                        : sel.scope.map(function (s) { return '<code style="margin-right: 4px;">' + escAttr(s) + '</code>'; }).join(' ');
+                                    var runHtml = sel.run_ids.length === 0
+                                        ? '<em class="text-muted">all</em>'
+                                        : sel.run_ids.length + ' selected';
+
+                                    if (wasCreate) {
+                                        // Dynamically add the new row to the credentials table
+                                        var $table = $panel.find('.api-credentials-list');
+                                        var rowHtml = '<tr data-client-id="' + escAttr(response.data.client_id) + '" data-label="' + escAttr(response.data.label) + '" data-run-ids="' + escAttr(sel.run_ids.join(',')) + '">'
+                                            + '<td><strong>' + escAttr(response.data.label) + '</strong></td>'
+                                            + '<td><code>' + escAttr(response.data.client_id) + '</code></td>'
+                                            + '<td>' + scopeHtml + '</td>'
+                                            + '<td>' + runHtml + '</td>'
+                                            + '<td>'
+                                            + '<button type="button" class="btn btn-warning btn-xs api-rotate-btn"><i class="fa fa-refresh"></i> Rotate</button> '
+                                            + '<button type="button" class="btn btn-danger btn-xs api-delete-btn"><i class="fa fa-trash"></i> Delete</button>'
+                                            + '</td>'
+                                            + '</tr>';
+                                        if ($table.length === 0) {
+                                            $panel.find('h4.lead:contains("Your credentials") ~ p.text-muted').remove();
+                                            $panel.find('h4.lead:contains("Your credentials")').after(
+                                                '<table class="table table-bordered api-credentials-list">'
+                                                + '<thead><tr><th>Label</th><th>Client ID</th><th>Scopes</th><th>Runs</th><th></th></tr></thead>'
+                                                + '<tbody>' + rowHtml + '</tbody>'
+                                                + '</table>'
+                                            );
+                                        } else {
+                                            $table.find('tbody').prepend(rowHtml);
+                                        }
+                                    } else {
+                                        // Update the existing row with the new scopes/runs
+                                        var $row = $panel.find('.api-credentials-list tr[data-client-id="' + escAttr(rotateClientId) + '"]');
+                                        if ($row.length) {
+                                            $row.attr('data-run-ids', sel.run_ids.join(','));
+                                            $row.find('td:eq(2)').html(scopeHtml);
+                                            $row.find('td:eq(3)').html(runHtml);
+                                        }
+                                    }
+                                    // Reset form back to create mode, keeping the secret visible
+                                    enterCreateMode();
+                                    $panel.find('#api-secret-once').removeClass('hidden');
                                 }).fail(function () {
                                     alert('Request failed.');
                                     $submitBtn.prop('disabled', false);
@@ -408,7 +470,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 // The row only shows a count of runs, not the actual ids — leave runs unselected
                                 // and the user can re-pick. (Keeping the previous allowlist would require an extra
                                 // round-trip.)
-                                enterRotateMode(clientId, label, scopes, []);
+                                enterRotateMode(clientId, label, scopes, ($row.attr('data-run-ids') || '').split(',').filter(Boolean).map(Number));
                             });
                             $panel.on('click', '.api-delete-btn', function () {
                                 var $row = jQuery(this).closest('tr');
@@ -422,7 +484,13 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     dataType: 'json'
                                 }).done(function (response) {
                                     if (response && response.success) {
+                                        var $tbody = $row.closest('tbody');
                                         $row.remove();
+                                        if (0 === $tbody.children('tr').length) {
+                                            $tbody.closest('table').replaceWith(
+                                                '<p class="text-muted"><em>You have no API credentials yet. Create one below.</em></p>'
+                                            );
+                                        }
                                         if (clientId === rotateClientId) enterCreateMode();
                                     } else {
                                         alert((response && response.message) || 'Could not delete credential.');
@@ -431,6 +499,10 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             });
                             $panel.on('click', '#api-create-btn', submitForm);
                             $panel.on('click', '#api-cancel-rotate-btn', enterCreateMode);
+                            $panel.on('click', '.api-clear-runs', function (e) {
+                                e.preventDefault();
+                                $form.find('select[name="api_run_ids[]"] option').prop('selected', false);
+                            });
 
                             // "Select all" toggles every scope checkbox
                             $panel.on('change', '#api-scope-select-all', function () {
