@@ -422,7 +422,13 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     dataType: 'json'
                                 }).done(function (response) {
                                     if (response && response.success) {
+                                        var $tbody = $row.closest('tbody');
                                         $row.remove();
+                                        if (0 === $tbody.children('tr').length) {
+                                            $tbody.closest('table').replaceWith(
+                                                '<p class="text-muted"><em>You have no API credentials yet. Create one below.</em></p>'
+                                            );
+                                        }
                                         if (clientId === rotateClientId) enterCreateMode();
                                     } else {
                                         alert((response && response.message) || 'Could not delete credential.');
