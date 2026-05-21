@@ -188,7 +188,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     </table>
                                 </div>
 
-                                <h4 class="lead" style="margin-top: 30px;">Create a new credential</h4>
+                                <h4 id="api-form-heading" class="lead" style="margin-top: 30px;">Create a new credential</h4>
                                 <div class="api-form" data-form-mode="create">
                                     <div class="row">
                                         <div class="col-md-8">
@@ -298,6 +298,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             var $submitLabel = $panel.find('.api-submit-label');
                             var $cancelBtn = $panel.find('#api-cancel-rotate-btn');
                             var $labelInput = $panel.find('#api-label-input');
+                            var $formHeading = $panel.find('#api-form-heading');
                             // rotate state — when non-null the form submits a rotate
                             // for this client_id (label is fixed and disabled).
                             var rotateClientId = null;
@@ -328,6 +329,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 $submitLabel.text('Create credential');
                                 $submitBtn.removeClass('btn-warning').addClass('btn-primary');
                                 $cancelBtn.hide();
+                                $formHeading.text('Create a new credential');
                                 $form.find('input[name="api_scope[]"]').prop('checked', false);
                                 $panel.find('#api-scope-select-all').prop('checked', false);
                                 $form.find('select[name="api_run_ids[]"] option:selected').prop('selected', false);
@@ -342,6 +344,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 $submitLabel.text('Rotate secret for "' + label + '"');
                                 $submitBtn.removeClass('btn-primary').addClass('btn-warning');
                                 $cancelBtn.show();
+                                $formHeading.text('Rotate credential');
                                 $form.find('input[name="api_scope[]"]').each(function () {
                                     this.checked = scopes.indexOf(this.value) !== -1;
                                 });
@@ -368,6 +371,14 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     var label = jQuery.trim($labelInput.val());
                                     if (!label) {
                                         alert('Please pick a label for this credential.');
+                                        return;
+                                    }
+                                    var existingLabels = $panel.find('.api-credentials-list tbody tr').map(function () {
+                                        return jQuery(this).data('label');
+                                    }).get();
+                                    if (existingLabels.some(function (l) { return l.toLowerCase() === label.toLowerCase(); })) {
+                                        alert('You already have a credential with the label "' + label + '". Each label must be unique within your account.');
+                                        $submitBtn.prop('disabled', false);
                                         return;
                                     }
                                     payload = jQuery.extend({ api_action: 'create', label: label }, sel);
