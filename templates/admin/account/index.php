@@ -129,7 +129,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             <div id="api-credentials-panel"
                                  data-endpoint="<?= admin_url('account/api-credentials') ?>">
 
-                                <h5 style="margin-top: 20px;">Your credentials</h5>
+                                <h4 class="lead" style="margin-top: 20px;">Your credentials</h4>
                                 <?php if (empty($api_credentials_list)): ?>
                                     <p class="text-muted"><em>You have no API credentials yet. Create one below.</em></p>
                                 <?php else: ?>
@@ -168,53 +168,6 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     </table>
                                 <?php endif; ?>
 
-                                <h5 style="margin-top: 30px;">Create a new credential</h5>
-                                <div class="api-form" data-form-mode="create">
-                                    <div class="form-group">
-                                        <label class="control-label" for="api-label-input">Label</label>
-                                        <input id="api-label-input" type="text" maxlength="64" class="form-control"
-                                               style="max-width: 360px;"
-                                               placeholder="e.g. dashboard, cron-2026">
-                                        <p class="help-block">Used only on this page to tell credentials apart. Must be unique within your account; <code>internal</code> is reserved.</p>
-                                    </div>
-
-                                    <fieldset class="api-scope-picker">
-                                        <legend>Scopes</legend>
-                                        <p class="help-block">
-                                            Pick exactly the capabilities this credential should grant. A token with no scopes cannot do anything.
-                                        </p>
-                                        <?php foreach ($available_scopes as $scope_key => $scope_label): ?>
-                                            <div class="checkbox">
-                                                <label>
-                                                    <input type="checkbox" name="api_scope[]" value="<?= h($scope_key) ?>">
-                                                    <code><?= h($scope_key) ?></code> — <?= h($scope_label) ?>
-                                                </label>
-                                            </div>
-                                        <?php endforeach; ?>
-
-                                        <legend style="margin-top: 20px;">Restrict to runs</legend>
-                                        <p class="help-block">
-                                            Leave empty to allow this credential to act on all of your runs. Selecting one or more runs limits the credential to those runs and to surveys that are part of them.
-                                        </p>
-                                        <?php if (empty($user_runs)): ?>
-                                            <p class="text-muted"><em>You have no runs yet.</em></p>
-                                        <?php else: ?>
-                                            <select name="api_run_ids[]" multiple class="form-control" size="<?= min(8, max(3, count($user_runs))) ?>" style="width: 100%; max-width: 480px;">
-                                                <?php foreach ($user_runs as $run_row): ?>
-                                                    <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        <?php endif; ?>
-                                    </fieldset>
-
-                                    <button type="button" class="btn btn-primary btn-raised" id="api-create-btn" style="margin-top: 15px;">
-                                        <i class="fa fa-key"></i> <span class="api-submit-label">Create credential</span>
-                                    </button>
-                                    <button type="button" class="btn btn-default" id="api-cancel-rotate-btn" style="margin-top: 15px; display: none;">
-                                        Cancel
-                                    </button>
-                                </div>
-
                                 <div id="api-secret-once" class="hidden" style="margin-top: 20px;">
                                     <div class="alert alert-warning">
                                         <strong>One-time display.</strong> Copy the client secret now — we only store a hash, so it cannot be recovered later.
@@ -234,6 +187,85 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                         </tr>
                                     </table>
                                 </div>
+
+                                <h4 class="lead" style="margin-top: 30px;">Create a new credential</h4>
+                                <div class="api-form" data-form-mode="create">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="form-group">
+                                                <label class="control-label" for="api-label-input">Label</label>
+                                                <input id="api-label-input" type="text" maxlength="64" class="form-control"
+                                                       placeholder="e.g. dashboard, cron-2026">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label class="control-label">&nbsp;</label>
+                                                <button type="button" class="btn btn-primary btn-raised btn-block" id="api-create-btn" disabled>
+                                                    <i class="fa fa-key"></i> <span class="api-submit-label">Create credential</span>
+                                                </button>
+                                                <button type="button" class="btn btn-default btn-block" id="api-cancel-rotate-btn" style="margin-top: 5px; display: none;">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="help-block" style="margin-bottom: 25px;">Used only on this page to tell credentials apart. Must be unique within your account; internal is reserved. Enter a label to enable the create button.</p>
+
+                                    <div class="row">
+                                        <div class="col-md-7">
+                                            <fieldset>
+                                                <legend>Scopes</legend>
+                                                <p class="help-block">
+                                                    Pick exactly the capabilities this credential should grant. A token with no scopes cannot do anything.
+                                                </p>
+
+                                                <div class="checkbox">
+                                                    <label>
+                                                        <input type="checkbox" id="api-scope-select-all">
+                                                        <strong>Select all scopes</strong>
+                                                    </label>
+                                                </div>
+                                                <hr style="margin-top: 5px; margin-bottom: 10px;">
+
+                                                <div class="row">
+                                                    <?php $scope_chunks = array_chunk($available_scopes, 6, true); ?>
+                                                    <?php foreach ($scope_chunks as $chunk): ?>
+                                                    <div class="col-md-6">
+                                                        <?php foreach ($chunk as $scope_key => $scope_label): ?>
+                                                        <div class="checkbox">
+                                                            <label>
+                                                                <input type="checkbox" name="api_scope[]" value="<?= h($scope_key) ?>">
+                                                                <code><?= h($scope_key) ?></code> — <?= h($scope_label) ?>
+                                                            </label>
+                                                        </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+
+                                        <div class="col-md-5">
+                                            <fieldset>
+                                                <legend>Restrict to runs</legend>
+                                                <p class="help-block">
+                                                    Leave empty to allow this credential to act on all of your runs. Selecting one or more runs limits the credential to those runs and to surveys that are part of them.
+                                                </p>
+                                                <?php if (empty($user_runs)): ?>
+                                                    <p class="text-muted"><em>You have no runs yet.</em></p>
+                                                <?php else: ?>
+                                                    <select name="api_run_ids[]" multiple class="form-control" size="<?= min(8, max(3, count($user_runs))) ?>" style="width: 100%;">
+                                                        <?php foreach ($user_runs as $run_row): ?>
+                                                            <option value="<?= (int) $run_row['id'] ?>"><?= h($run_row['name']) ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                <?php endif; ?>
+                                            </fieldset>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <noscript>
                                     <div class="alert alert-info" style="margin-top: 15px;">
                                         JavaScript is required to generate or rotate API credentials.
@@ -260,7 +292,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             var $panel = jQuery('#api-credentials-panel');
                             if (!$panel.length) { return; }
                             var endpoint = $panel.data('endpoint');
-                            var apiHost = <?= json_encode(rtrim(site_url('api'), '/')) ?>;
+                            var apiHost = <?= json_encode(api_base_url()) ?>;
                             var $form = $panel.find('.api-form');
                             var $submitBtn = $panel.find('#api-create-btn');
                             var $submitLabel = $panel.find('.api-submit-label');
@@ -292,10 +324,12 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 rotateClientId = null;
                                 $form.attr('data-form-mode', 'create');
                                 $labelInput.prop('disabled', false).val('');
+                                $submitBtn.prop('disabled', true);
                                 $submitLabel.text('Create credential');
                                 $submitBtn.removeClass('btn-warning').addClass('btn-primary');
                                 $cancelBtn.hide();
                                 $form.find('input[name="api_scope[]"]').prop('checked', false);
+                                $panel.find('#api-scope-select-all').prop('checked', false);
                                 $form.find('select[name="api_run_ids[]"] option:selected').prop('selected', false);
                                 $panel.find('#api-secret-once').addClass('hidden');
                             }
@@ -304,12 +338,16 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 rotateClientId = clientId;
                                 $form.attr('data-form-mode', 'rotate');
                                 $labelInput.prop('disabled', true).val(label);
+                                $submitBtn.prop('disabled', false);
                                 $submitLabel.text('Rotate secret for "' + label + '"');
                                 $submitBtn.removeClass('btn-primary').addClass('btn-warning');
                                 $cancelBtn.show();
                                 $form.find('input[name="api_scope[]"]').each(function () {
                                     this.checked = scopes.indexOf(this.value) !== -1;
                                 });
+                                var totalScopes = $form.find('input[name="api_scope[]"]').length;
+                                var checkedScopes = $form.find('input[name="api_scope[]"]:checked').length;
+                                $panel.find('#api-scope-select-all').prop('checked', totalScopes === checkedScopes);
                                 $form.find('select[name="api_run_ids[]"] option').each(function () {
                                     this.selected = runIds.indexOf(parseInt(this.value, 10)) !== -1;
                                 });
@@ -317,10 +355,6 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 jQuery('html, body').animate({
                                     scrollTop: $form.offset().top - 80
                                 }, 200);
-                            }
-
-                            function reloadAfter(ms) {
-                                setTimeout(function () { window.location.reload(); }, ms);
                             }
 
                             function submitForm() {
@@ -389,6 +423,7 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 }).done(function (response) {
                                     if (response && response.success) {
                                         $row.remove();
+                                        if (clientId === rotateClientId) enterCreateMode();
                                     } else {
                                         alert((response && response.message) || 'Could not delete credential.');
                                     }
@@ -396,6 +431,24 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                             });
                             $panel.on('click', '#api-create-btn', submitForm);
                             $panel.on('click', '#api-cancel-rotate-btn', enterCreateMode);
+
+                            // "Select all" toggles every scope checkbox
+                            $panel.on('change', '#api-scope-select-all', function () {
+                                var checked = this.checked;
+                                $form.find('input[name="api_scope[]"]').prop('checked', checked);
+                            });
+
+                            // Unchecking a scope unchecks "Select all"; re-checking all re-checks it
+                            $panel.on('change', 'input[name="api_scope[]"]', function () {
+                                var all = $form.find('input[name="api_scope[]"]');
+                                var checked = all.filter(':checked');
+                                $panel.find('#api-scope-select-all').prop('checked', all.length === checked.length);
+                            });
+
+                            // Enable create button only when a label is entered
+                            $labelInput.on('input', function () {
+                                $submitBtn.prop('disabled', jQuery.trim(this.value) === '');
+                            });
                         })();
                         </script>
                         <!-- /.tab-pane -->
@@ -406,35 +459,36 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                     <strong>Warning!</strong> This action cannot be undone. All your data, including surveys, runs, and email accounts will be permanently deleted.
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="control-label" for="delete_confirm">Type "I understand my data will be gone"</label>
-                                    <input class="form-control" type="text" id="delete_confirm" name="delete_confirm" required
-                                        placeholder="I understand my data will be gone" autocomplete="off">
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="control-label" for="delete_email">Type your current email address</label>
-                                    <input class="form-control" type="text" id="delete_email" name="delete_email" required
-                                        placeholder="<?= h($user->email) ?>" autocomplete="off">
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="control-label" for="delete_password">Current Password</label>
-                                    <input class="form-control" type="password" id="delete_password" name="delete_password" required autocomplete="current-password">
-                                </div>
-
-                                <?php if ($user->is2FAenabled()): ?>
-                                    <div class="form-group">
-                                        <label class="control-label" for="delete_2fa">Two-Factor Authentication Code</label>
-                                        <input class="form-control" type="text" id="delete_2fa" name="delete_2fa" required placeholder="Enter your 2FA code" autocomplete="one-time-code">
+                                <div class="row">
+                                    <div class="form-group col-md-8">
+                                        <label class="control-label" for="delete_confirm">Type "I understand my data will be gone"</label>
+                                        <input class="form-control" type="text" id="delete_confirm" name="delete_confirm" required
+                                            placeholder="I understand my data will be gone" autocomplete="off">
                                     </div>
-                                <?php endif; ?>
 
+                                    <div class="form-group col-md-8">
+                                        <label class="control-label" for="delete_email">Type your current email address</label>
+                                        <input class="form-control" type="text" id="delete_email" name="delete_email" required
+                                            placeholder="<?= h($user->email) ?>" autocomplete="off">
+                                    </div>
 
-                                <div class="form-group">
-                                    <button type="submit" name="delete_account" value="true" class="btn btn-danger btn-raised">
-                                        <i class="fa fa-trash"></i> Permanently Delete Account
-                                    </button>
+                                    <div class="form-group col-md-8">
+                                        <label class="control-label" for="delete_password">Current Password</label>
+                                        <input class="form-control" type="password" id="delete_password" name="delete_password" required autocomplete="current-password">
+                                    </div>
+
+                                    <?php if ($user->is2FAenabled()): ?>
+                                        <div class="form-group col-md-8">
+                                            <label class="control-label" for="delete_2fa">Two-Factor Authentication Code</label>
+                                            <input class="form-control" type="text" id="delete_2fa" name="delete_2fa" required placeholder="Enter your 2FA code" autocomplete="one-time-code">
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="form-group col-md-5">
+                                        <button type="submit" name="delete_account" value="true" class="btn btn-danger btn-raised">
+                                            <i class="fa fa-trash"></i> Permanently Delete Account
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -450,29 +504,31 @@ remotes::install_github("rubenarslan/formr")</code></pre>
                                 <div class="alert alert-success">
                                     <i class="fa fa-check-circle"></i> Two-factor authentication is enabled for your account.
                                 </div>
-                                <div class="form-group col-md-6">
-                                    <a href="<?= admin_url('account/manage-two-factor') ?>" class="btn btn-raised btn-warning">
-                                        <i class="fa fa-cog"></i> Manage 2FA Settings
-                                    </a>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <a href="<?= admin_url('account/manage-two-factor') ?>" class="btn btn-raised btn-warning">
+                                            <i class="fa fa-cog"></i> Manage 2FA Settings
+                                        </a>
+                                    </div>
                                 </div>
                             <?php else: ?>
-                                <div class="form-group col-md-6">
-                                    <div class="alert alert-warning">
-                                        <i class="fa fa-warning"></i> Two-factor authentication is not enabled for your account. Enable it to add an extra layer of security.
+                                <div class="row">
+                                    <div class="col-md-6" style="margin-bottom: 15px;">
+                                        <div class="alert alert-warning">
+                                            <i class="fa fa-warning"></i> Two-factor authentication is not enabled for your account. Enable it to add an extra layer of security.
+                                        </div>
+                                        <p>
+                                            Two-factor authentication adds an extra layer of security to your account.
+                                            Once enabled, you'll need both your password and a code from your authenticator app to log in.
+                                        </p>
                                     </div>
-                                    <p>
-                                        Two-factor authentication adds an extra layer of security to your account.
-                                        Once enabled, you'll need both your password and a code from your authenticator app to log in.
-                                    </p>
-                                </div>
-                                <div class="form-group col-md-12">
-                                    <a href="<?= admin_url('account/setup-two-factor') ?>" class="btn btn-raised btn-primary">
-                                        <i class="fa fa-lock"></i> Setup 2FA
-                                    </a>
+                                    <div class="col-md-6">
+                                        <a href="<?= admin_url('account/setup-two-factor') ?>" class="btn btn-raised btn-primary">
+                                            <i class="fa fa-lock"></i> Setup 2FA
+                                        </a>
+                                    </div>
                                 </div>
                             <?php endif; ?>
-
-                            <div class="clearfix"></div>
                         </div>
                     </div>
                     <!-- /.tab-content -->
