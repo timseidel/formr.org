@@ -29,15 +29,9 @@ class Site {
     protected $runSessions = array();
 
     /**
-     * Admin-context current run. RunSession-driven flows (participants)
-     * keep going through getRunSession()/run_session(); this slot is set
-     * by AdminRunController when an admin is acting on a specific run
-     * (overview, settings, etc.), so opencpu helpers can mint an
-     * owner-scoped API token even without a participant session.
-     *
-     * @var Run|null
+     * Session key for the admin-context current run name. See setRun().
      */
-    protected $run;
+    const ADMIN_RUN_NAME_KEY = 'current_admin_run_name';
     
     /**
      * 
@@ -236,15 +230,28 @@ class Site {
         return isset($this->runSessions[$id]) ? $this->runSessions[$id] : null;
     }
 
+    /**
+     * Mark a run as the admin's currently-active run. Stored in $_SESSION
+     * (not on $this) because index.php and Site::getInstance() return
+     * different Site instances within the same request — anything set on
+     * the controller-threaded Site is invisible to globals-driven callers
+     * like opencpu_prepare_api_access that go through Site::getInstance().
+     * Mirrors how setRunSession persists `current_run_session_code`.
+     */
     public function setRun(Run $run) {
-        $this->run = $run;
+        Session::set(self::ADMIN_RUN_NAME_KEY, $run->name);
     }
 
     /**
      * @return Run|null
      */
     public function getRun() {
-        return $this->run;
+        $name = Session::get(self::ADMIN_RUN_NAME_KEY);
+        if (!$name) {
+            return null;
+        }
+        $run = new Run($name);
+        return $run->valid ? $run : null;
     }
 
     /**
