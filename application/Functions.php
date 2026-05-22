@@ -1146,11 +1146,20 @@ function opencpu_prepare_api_access($code, &$variables)
         // Try to get the run session from the Site instance for test runs where run_session() does not work.
         $run_session = Site::getInstance()->getRunSession();
     }
-    if (!$run_session) {
-        return null;
-    }
 
-    $run = $run_session->getRun();
+    $run = null;
+    if ($run_session) {
+        $run = $run_session->getRun();
+    }
+    if (!$run) {
+        // Admin contexts (overview-script render, mockup, etc.) reach
+        // this helper without a participant RunSession. Fall back to the
+        // Site-level current run, which AdminRunController pushes when
+        // it routes to a specific run. The embedded token is owner-scoped
+        // and run-restricted, so this is safe — the admin can't reach
+        // this code path without being authorized to view the run.
+        $run = Site::getInstance()->getRun();
+    }
     if (!$run) {
         return null;
     }

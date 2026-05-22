@@ -27,6 +27,17 @@ class Site {
      * @var RunSession[]
      */
     protected $runSessions = array();
+
+    /**
+     * Admin-context current run. RunSession-driven flows (participants)
+     * keep going through getRunSession()/run_session(); this slot is set
+     * by AdminRunController when an admin is acting on a specific run
+     * (overview, settings, etc.), so opencpu helpers can mint an
+     * owner-scoped API token even without a participant session.
+     *
+     * @var Run|null
+     */
+    protected $run;
     
     /**
      * 
@@ -216,13 +227,24 @@ class Site {
             // if $id is null, get from current session
             $session = Session::get('current_run_session_code');
         }
-        
+
         if (!$session) {
             return null;
         }
 
         $id = md5($session);
         return isset($this->runSessions[$id]) ? $this->runSessions[$id] : null;
+    }
+
+    public function setRun(Run $run) {
+        $this->run = $run;
+    }
+
+    /**
+     * @return Run|null
+     */
+    public function getRun() {
+        return $this->run;
     }
 
     /**
