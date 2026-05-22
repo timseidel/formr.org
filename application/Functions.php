@@ -56,7 +56,15 @@ function notify_user_error($error, $public_message = '')
 
     $message = $date . ': ' . $public_message . "<br>";
 
-    if ($run_session && ($run_session->isCron() || $run_session->isTesting())) {
+    // Show the actual error body whenever the viewer isn't a real
+    // participant. That's: cron/queue daemons, test sessions, and
+    // admin contexts that have no run_session at all (e.g. the
+    // OverviewScriptPage render path). The participant-facing case
+    // — a regular run_session that isn't cron and isn't testing —
+    // still gets only the public_message, so internal error text
+    // doesn't leak through a survey page. Matches the same logic
+    // that drives $show_errors='TRUE' in the OpenCPU knit chunks.
+    if (!$run_session || $run_session->isCron() || $run_session->isTesting()) {
         if ($error instanceof Exception) {
             $message .= $error->getMessage();
         } else {
@@ -1443,8 +1451,18 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
         $source = $parts[2];
     }
 
+    // include=FALSE on the settings chunk: the chunk's R code still runs
+    // (library() / opts_chunk$set() / variable assignments), but the chunk
+    // source never lands in the rendered output. This matters because
+    // $variables contains the .formr$access_token = '…' assignment that
+    // opencpu_prepare_api_access injected — with echo=TRUE (the previous
+    // mode in admin/test context) that token leaked into the rendered
+    // iframe. include=FALSE also dominates over echo / warning / message,
+    // so a stray warning during the variable assignment can't leak the
+    // token either. opts_chunk$set on the next line still carries the
+    // show_warnings setting forward to user chunks.
     $source = $yaml .
-        '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . '}
+        '```{r settings,include=FALSE}
 library(knitr); library(formr)
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '

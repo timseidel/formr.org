@@ -147,6 +147,7 @@ Authorization: Bearer {access-token}
     <tr><td><code>/v1/runs</code></td><td>GET (list) &rarr; <code>run:read</code></td></tr>
     <tr><td><code>/v1/runs/{name}</code></td><td>GET &rarr; <code>run:read</code>; POST / PATCH / DELETE &rarr; <code>run:write</code></td></tr>
     <tr><td><code>/v1/runs/{name}/sessions</code></td><td>GET &rarr; <code>session:read</code>; POST / DELETE &rarr; <code>session:write</code></td></tr>
+    <tr><td><code>/v1/runs/{name}/unit_sessions</code></td><td>GET &rarr; <code>session:read</code></td></tr>
     <tr><td><code>/v1/runs/{name}/results</code></td><td>GET &rarr; <code>data:read</code></td></tr>
     <tr><td><code>/v1/runs/{name}/files</code></td><td>GET &rarr; <code>file:read</code>; POST / DELETE &rarr; <code>file:write</code></td></tr>
     <tr><td><code>/v1/runs/{name}/structure</code></td><td>GET &rarr; <code>run:read</code>; PUT &rarr; <code>run:write</code></td></tr>
@@ -247,8 +248,42 @@ formr_api_session()$scope
 # Call resource helpers
 runs    <- formr_api_runs()
 details <- formr_api_get_run("my-diary")
+
+# Per-unit interaction history — every (participant x unit x iteration)
+# row, ordered so consecutive entries per session are trajectory edges.
+# This is what the default Overview script's Sankey is built on.
+us <- formr_api_unit_sessions("my-diary", testing = FALSE)
 </code>
 </pre>
+
+<h5>Unit-session history</h5>
+
+<p>
+    <code>GET /v1/runs/{name}/unit_sessions</code> is the history view that
+    complements <code>/v1/runs/{name}/sessions</code> (which exposes only each
+    participant's <em>current</em> unit). One JSON row per
+    <code>survey_unit_sessions</code> row, ordered by
+    <code>(session, created, unit_session_id)</code> so consecutive rows per
+    participant are trajectory edges.
+</p>
+
+<p>
+    Filters: <code>?session=&lt;code&gt;</code> (or comma-list) to narrow
+    to specific participants; <code>?testing=true|false</code> to split
+    real vs. test sessions; <code>?since=&lt;ISO 8601&gt;</code> for
+    incremental polling. Pagination via <code>limit</code> (default 1000,
+    max 10000) and <code>offset</code>. Scope: <code>session:read</code>.
+</p>
+
+<p>
+    Special units (<code>OverviewScriptPage</code>,
+    <code>ServiceMessagePage</code>, <code>ReminderEmail</code>) surface with
+    <code>position = null</code> because they live outside the ordered run
+    flow. The Track A <code>state</code> enum is one of
+    <code>PENDING</code>, <code>RUNNING</code>, <code>WAITING_USER</code>,
+    <code>WAITING_TIMER</code>, <code>ENDED</code>, <code>EXPIRED</code>, or
+    <code>SUPERSEDED</code> (NULL on legacy rows from before patch 047).
+</p>
 
 <h4>Legacy: /get/results (V0)</h4>
 
