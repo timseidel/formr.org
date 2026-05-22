@@ -24,9 +24,10 @@
     in any language.
 </p>
 
+<?php $api_base = api_base_url(); ?>
 <p>
     API base URL: <br />
-    <code class="php">https://api.formr.org</code>
+    <code class="php"><?= h($api_base) ?></code>
 </p>
 
 <h4>1. Get API credentials</h4>
@@ -200,17 +201,17 @@ HTTP/1.1 403 Forbidden
 <pre>
 <code class="bash">
 # 1) Get a token
-ACCESS_TOKEN=$(curl -s -X POST https://api.formr.org/oauth/access_token \
+ACCESS_TOKEN=$(curl -s -X POST <?= h($api_base) ?>/oauth/access_token \
   -d grant_type=client_credentials \
   -d client_id=$CLIENT_ID \
   -d client_secret=$CLIENT_SECRET | jq -r .access_token)
 
 # 2) List runs visible to this credential
-curl -s https://api.formr.org/v1/runs \
+curl -s <?= h($api_base) ?>/v1/runs \
   -H "Authorization: Bearer $ACCESS_TOKEN" | jq
 
 # 3) Read one run (subject to the credential's run allowlist if any)
-curl -s https://api.formr.org/v1/runs/my-diary \
+curl -s <?= h($api_base) ?>/v1/runs/my-diary \
   -H "Authorization: Bearer $ACCESS_TOKEN" | jq
 </code>
 </pre>
@@ -230,14 +231,14 @@ library(formr)
 
 # One-time: store the credentials you generated at admin/account#api
 formr_store_keys(
-    host = "https://api.formr.org",
+    host = "<?= h($api_base) ?>",
     client_id = "YOUR_CLIENT_ID",
     client_secret = "YOUR_CLIENT_SECRET"
 )
 
 # Authenticate (auto-picks up stored keys; also auto-picks up the
-# embedded token when called inside an OpenCPU R block on formr.org)
-formr_api_authenticate(host = "https://api.formr.org")
+# embedded token when called inside an OpenCPU R block on this server)
+formr_api_authenticate(host = "<?= h($api_base) ?>")
 
 # Inspect which scopes the credential carries
 formr_api_session()$scope
