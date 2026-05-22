@@ -314,37 +314,52 @@ class OAuthHelper
 
         $details = $this->generateClientDetails($formrUser);
         $db = Site::getDb();
-        // Pre-insert a stub row carrying the label, so that
-        // setClientDetails takes the UPDATE branch (which doesn't touch
-        // label) instead of the INSERT branch (which would write a NULL
-        // label and trip the NOT NULL constraint added in patch 054).
+
+        // All three writes (stub INSERT into oauth_clients, the
+        // setClientDetails UPDATE through bshaffer's storage, and the
+        // oauth_client_runs allowlist via replaceClientRuns) must succeed
+        // or fail together — otherwise a setClientDetails-fails branch
+        // could leave a stub credential with empty scope/secret, and a
+        // replaceClientRuns-fails branch could leave a credential with
+        // the wrong run allowlist. Site::getOauthServer shares the PDO
+        // with Site::getDb() specifically so this transaction covers
+        // the storage write too.
+        //
+        // The stub INSERT is required because oauth_clients.label is
+        // NOT NULL (patch 054) but setClientDetails — bshaffer's INSERT
+        // branch — doesn't include the label column. The stub gives
+        // setClientDetails an UPDATE path that doesn't touch label.
         try {
+            $db->beginTransaction();
+
             $db->insert($this->config['client_table'], [
                 'client_id' => $details['client_id'],
                 'client_secret' => '',
                 'user_id' => $formrUser->email,
                 'label' => $label,
             ]);
-        } catch (\Exception $e) {
-            error_log('OAuthHelper::createClientInternal INSERT failed for user ' . $formrUser->id . ' label "' . $label . '": ' . $e->getMessage());
-            return false;
-        }
 
-        $ok = $this->storage->setClientDetails(
-            $details['client_id'],
-            $details['client_secret']->getString(),
-            self::DEFAULT_REDIRECT_URL,
-            null,
-            implode(' ', $scopes),
-            $formrUser->email
-        );
-        if (!$ok) {
-            error_log('OAuthHelper::createClientInternal setClientDetails failed for user ' . $formrUser->id . ' label "' . $label . '"');
-            $db->delete($this->config['client_table'], ['client_id' => $details['client_id']]);
+            $ok = $this->storage->setClientDetails(
+                $details['client_id'],
+                $details['client_secret']->getString(),
+                self::DEFAULT_REDIRECT_URL,
+                null,
+                implode(' ', $scopes),
+                $formrUser->email
+            );
+            if (!$ok) {
+                throw new \Exception('setClientDetails returned false');
+            }
+
+            $this->replaceClientRuns($details['client_id'], $runIds);
+
+            $db->commit();
+            return $details;
+        } catch (\Exception $e) {
+            $db->rollBack();
+            error_log('OAuthHelper::createClientInternal failed for user ' . $formrUser->id . ' label "' . $label . '": ' . $e->getMessage());
             return false;
         }
-        $this->replaceClientRuns($details['client_id'], $runIds);
-        return $details;
     }
 
     /**
