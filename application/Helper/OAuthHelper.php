@@ -667,12 +667,20 @@ class OAuthHelper
         // is fixed by interface — adding a parameter would break the
         // grant flow's call site. Two SQL hits for internal tokens,
         // zero overhead for external ones (which pass $forRun = null).
+        // `expires = expires` is load-bearing: the `oauth_access_tokens`
+        // table historically carried MariaDB's auto-applied
+        // `ON UPDATE current_timestamp()` on the `expires` column, which
+        // would otherwise clobber the freshly-set lifetime back to NOW()
+        // and 401 the embedded token on its first use. Patch 056 strips
+        // the ON UPDATE clause on hosts that migrate forward, but we
+        // include the field explicitly here so the fix also holds on
+        // hosts that haven't applied 056 yet.
         if ($forRun !== null) {
             $runIds = $this->normaliseRunIds($forRun);
             if (!empty($runIds)) {
                 $db = Site::getDb();
                 $stmt = $db->prepare(sprintf(
-                    'UPDATE %s SET run_ids = :run_ids WHERE access_token = :access_token',
+                    'UPDATE %s SET run_ids = :run_ids, expires = expires WHERE access_token = :access_token',
                     $this->config['access_token_table']
                 ));
                 $stmt->execute([
