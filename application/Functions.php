@@ -1170,21 +1170,26 @@ function opencpu_prepare_api_access($code, &$variables)
     }
 
     $oauth = OAuthHelper::getInstance();
-    // 120s is the upper bound on a round-trip: formr mints the token,
+    // 600s is the upper bound on a round-trip: formr mints the token,
     // embeds it in an R variable, OpenCPU evaluates the snippet (which
     // may phone back into the v1 API), and we delete the token in the
-    // caller's finally block on return. The short lifetime is a safety
-    // net for the failure modes that skip the explicit delete (process
-    // crash, uncaught exception in opencpu_evaluate, OpenCPU timeout
-    // leaving the request hung). External API consumers go through
-    // the standard client_credentials grant and get the 1h default.
+    // caller's finally block on return. The lifetime needs to outlive
+    // the entire R session — auth runs early, but the second API call
+    // (e.g. formr_api_results) may follow heavy data wrangling, plotting,
+    // or knitr chunks. 120s was the original ceiling and turned out to
+    // be too tight: overview-script renders that took longer than two
+    // minutes 401'd on every API call after the first. 10min is a
+    // generous safety net for the failure modes that skip the explicit
+    // delete (process crash, uncaught exception, OpenCPU timeout),
+    // while staying under the 1h default that external client_credentials
+    // tokens get.
     // Stamp the token with a per-token run allowlist: this OpenCPU call
     // is operating in the context of exactly one run, so the embedded
     // R token has no reason to be able to touch any other run the owner
     // owns. Without $forRun, the token would inherit the owner's
     // per-client allowlist (commonly empty = unrestricted), which is
     // wider than what this short-lived helper needs.
-    $token_data = $oauth->createAccessTokenForUser($owner, 'user:read session:read session:write run:read data:read', false, 120, $run);
+    $token_data = $oauth->createAccessTokenForUser($owner, 'user:read session:read session:write run:read data:read', false, 600, $run);
 
     if (!$token_data || empty($token_data['access_token'])) {
         return null;
