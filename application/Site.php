@@ -347,7 +347,8 @@ class Site {
         // silently drift if bshaffer changes its built-in default.
         // Internal short-lived tokens for the OpenCPU round-trip are
         // minted via OAuthHelper::createAccessTokenForUser with an
-        // explicit 600s lifetime — see opencpu_prepare_api_access.
+        // explicit 180s lifetime, matching the OpenCPU `timelimit.post`
+        // ceiling — see opencpu_prepare_api_access.
         $server = new OAuth2\Server($storage, array(
             'access_lifetime' => 3600,
         ));
