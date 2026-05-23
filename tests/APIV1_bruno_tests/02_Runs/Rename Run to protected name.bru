@@ -1,0 +1,23 @@
+meta {
+  name: Rename Run to protected name
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{host}}/v1/runs/apitest
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {"name": "admin"}
+}
+
+assert {
+  res.status: eq 200
+}
