@@ -221,13 +221,11 @@ class RunUnit extends Model {
             'title' => 'Overview script',
             'special' => 'OverviewScriptPage',
             'body' => <<<'OVERVIEW_BODY'
-# Run overview
+# Study overview
 
 This page is rendered for the run owner through the formr v1 API.
-The embedded token (`.formr$access_token`, `.formr$host`,
-`.formr$run_name`) is short-lived and scoped to this run.
-See `?formr_api_authenticate` for the helper set, or
-`?formr_overview_sankey` for what's drawn below.
+See `?formr_api_authenticate` for the authentication helper, or
+`?formr_overview_sankey` for how the participant flow through the study is drawn.
 
 ```{r setup, include = FALSE}
 library(formr)
@@ -239,8 +237,7 @@ formr_overview_sankey()
 ```
 
 Customise freely — drop any R, knitr chunks, plotly / ggplot, raw
-markdown. `formr_api_unit_sessions()` gives you the underlying data
-if you'd rather build your own visualisation.
+markdown based on run data.
 OVERVIEW_BODY
         );
         $defaults['ReminderEmail'] = array(
