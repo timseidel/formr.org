@@ -44,6 +44,7 @@ class Run extends Model
     public $messages = array();
     public $custom_css_path = null;
     public $custom_js_path = null;
+    public $custom_r_path = null;
     public $manifest_json_path = null;
     public $header_image_path = null;
     public $title = null;
@@ -83,6 +84,7 @@ class Run extends Model
         "tos",
         "custom_css",
         "custom_js",
+        "custom_r",
         "manifest_json",
         "cron_active",
         "osf_project_id",
@@ -135,7 +137,7 @@ class Run extends Model
             return;
         }
 
-        $columns = "id, user_id, created, modified, name, api_secret_hash, public, cron_active, cron_fork, locked, header_image_path, title, description, description_parsed, footer_text, footer_text_parsed, public_blurb, public_blurb_parsed, privacy, privacy_parsed, tos, tos_parsed, custom_css_path, custom_js_path, manifest_json_path, osf_project_id, use_material_design, expire_cookie, expiresOn, vapid_public_key, vapid_private_key, pwa_icon_path";
+        $columns = "id, user_id, created, modified, name, api_secret_hash, public, cron_active, cron_fork, locked, header_image_path, title, description, description_parsed, footer_text, footer_text_parsed, public_blurb, public_blurb_parsed, privacy, privacy_parsed, tos, tos_parsed, custom_css_path, custom_js_path, custom_r_path, manifest_json_path, osf_project_id, use_material_design, expire_cookie, expiresOn, vapid_public_key, vapid_private_key, pwa_icon_path";
         $where = $this->id ? array('id' => $this->id) : array('name' => $this->name);
         $vars = $this->db->findRow('survey_runs', $where, $columns);
 
@@ -787,6 +789,21 @@ class Run extends Model
         return "";
     }
 
+    private $custom_r_cache = null;
+    private $custom_r_loaded = false;
+
+    public function getCustomRFunctions()
+    {
+        if ($this->custom_r_loaded) {
+            return $this->custom_r_cache;
+        }
+        $this->custom_r_loaded = true;
+        if ($this->custom_r_path != null) {
+            $this->custom_r_cache = $this->getFileContent($this->custom_r_path);
+        }
+        return $this->custom_r_cache;
+    }
+
     public function getManifestJSON()
     {
         if ($this->manifest_json_path != null) {
@@ -911,13 +928,16 @@ class Run extends Model
                 continue;
             }
 
-            if ($name == "custom_js" || $name == "custom_css" || $name == "manifest_json") {
+            if ($name == "custom_js" || $name == "custom_css" || $name == "custom_r" || $name == "manifest_json") {
                 if ($name == "custom_js") {
                     $asset_path = $this->custom_js_path;
                     $file_ending = '.js';
                 } elseif ($name == "custom_css") {
                     $asset_path = $this->custom_css_path;
                     $file_ending = '.css';
+                } elseif ($name == "custom_r") {
+                    $asset_path = $this->custom_r_path;
+                    $file_ending = '.R';
                 } elseif ($name == "manifest_json") {
                     $asset_path = $this->manifest_json_path;
                     $file_ending = '.json';
@@ -1205,6 +1225,7 @@ class Run extends Model
             'cron_active' => (int) $this->cron_active,
             'custom_js' => $this->getCustomJS(),
             'custom_css' => $this->getCustomCSS(),
+            'custom_r' => $this->getCustomRFunctions(),
             'expiresOn' => $this->expiresOn,
         );
 
