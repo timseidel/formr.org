@@ -1272,9 +1272,9 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
     $custom_r = opencpu_custom_r();
 
     $params = ['x' => '{ 
+' . ($custom_r ? $custom_r . "\n\n" : '') . '
 (function() {
 	library(formr)
-	' . ($custom_r ? $custom_r . "\n" : '') . '
 	' . $r_variables . '
 	' . $code . '
 })() }'];

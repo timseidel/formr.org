@@ -203,6 +203,8 @@
                                             (showif, value, feedback, <code>relative_to</code>, branch conditions, external URLs, email body, etc.).
                                             Functions are injected before your inline R code so you can call them by name.
                                             Use standard R syntax &mdash; define named functions, load libraries, or set global options.
+                                            To access run data (survey results, <code>survey_unit_sessions</code>, etc.), pass them as arguments &mdash;
+                                            functions cannot directly see variables defined in inline R code.
                                         </p>
                                         <div class="row">
                                             <div class="col-md-12">
