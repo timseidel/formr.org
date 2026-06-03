@@ -1233,6 +1233,23 @@ function opencpu_prepare_api_access($code, &$variables)
 }
 
 /**
+ * Get the custom R functions defined for the currently active run.
+ * Relies on the Run model's instance-level cache so the file is read
+ * at most once per request.
+ */
+function opencpu_custom_r()
+{
+    $run_session = Site::getInstance()->getRunSession();
+    if ($run_session) {
+        $run = $run_session->getRun();
+        if ($run) {
+            return $run->getCustomRFunctions();
+        }
+    }
+    return '';
+}
+
+/**
  * Execute a piece of code against OpenCPU
  *
  * @param string $code Each code line should be separated by a newline characted
@@ -1252,9 +1269,12 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
 
     $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
 
+    $custom_r = opencpu_custom_r();
+
     $params = ['x' => '{ 
 (function() {
 	library(formr)
+	' . ($custom_r ? $custom_r . "\n" : '') . '
 	' . $r_variables . '
 	' . $code . '
 })() }'];
@@ -1348,8 +1368,11 @@ function opencpu_knit_plaintext($source, $variables = null, $return_session = fa
         $show_warnings = 'TRUE';
     }
 
+    $custom_r = opencpu_custom_r();
+
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
+' . ($custom_r ? $custom_r . "\n" : '') . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1451,6 +1474,8 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
         $source = $parts[2];
     }
 
+    $custom_r = opencpu_custom_r();
+
     // include=FALSE on the settings chunk: the chunk's R code still runs
     // (library() / opts_chunk$set() / variable assignments), but the chunk
     // source never lands in the rendered output. This matters because
@@ -1464,6 +1489,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     $source = $yaml .
         '```{r settings,include=FALSE}
 library(knitr); library(formr)
+' . ($custom_r ? $custom_r . "\n" : '') . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
 ```
@@ -1519,8 +1545,11 @@ function opencpu_knitdisplay($source, $variables = null, $return_session = false
         $show_warnings = 'TRUE';
     }
 
+    $custom_r = opencpu_custom_r();
+
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
+' . ($custom_r ? $custom_r . "\n" : '') . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1553,8 +1582,11 @@ function opencpu_knitadmin($source, $variables = null, $return_session = false)
         $show_warnings = 'TRUE';
     }
 
+    $custom_r = opencpu_custom_r();
+
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
+' . ($custom_r ? $custom_r . "\n" : '') . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1586,8 +1618,11 @@ function opencpu_knit_email($source, array $variables = null, $return_format = '
         $show_warnings = 'TRUE';
     }
 
+    $custom_r = opencpu_custom_r();
+
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
+' . ($custom_r ? $custom_r . "\n" : '') . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.retina=2)
 opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' . $variables . '

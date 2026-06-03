@@ -26,6 +26,7 @@
                                 <li><a href="#privacy" data-toggle="tab" aria-expanded="false">Privacy</a></li>
                                 <li><a href="#css" data-toggle="tab" aria-expanded="false">CSS</a></li>
                                 <li><a href="#js" data-toggle="tab" aria-expanded="false">JS</a></li>
+                                <li><a href="#rfunctions" data-toggle="tab" aria-expanded="false">R Functions</a></li>
                                 <li><a href="#manifest" data-toggle="tab" aria-expanded="false">App</a></li>
                                 <li><a href="#service_message" data-toggle="tab" aria-expanded="false">Service message</a></li>
                                 <li><a href="#reminder" data-toggle="tab" aria-expanded="false">Reminder</a></li>
@@ -213,6 +214,31 @@
                                             <div class="col-md-12">
                                                 <div class="form-group">
                                                     <textarea data-editor="javascript" placeholder="Enter your custom JS here" name="custom_js" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomJS()); ?></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                <!-- /.tab-pane -->
+                                <div class="tab-pane" id="rfunctions">
+                                    <form enctype="multipart/form-data" method="post" action="<?php echo admin_run_url($run->name, 'ajax_save_settings'); ?>">
+                                        <p class="pull-right">
+                                            <input type="submit" name="submit_settings" value="Save" class="btn btn-primary save_settings">
+                                        </p>
+                                        <h4 class="lead"><i class="fa fa-cog"></i> R Functions</h4>
+                                        <p>
+                                            Define custom R functions here that will be available in every R evaluation context within this run
+                                            (showif, value, feedback, <code>relative_to</code>, branch conditions, external URLs, email body, etc.).
+                                            Functions are injected before your inline R code so you can call them by name.
+                                            Use standard R syntax &mdash; define named functions, load libraries, or set global options.
+                                        </p>
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="form-group">
+                                                    <textarea data-editor="r" placeholder="# Define your custom R functions here
+my_score <- function(data) {
+    mean(data, na.rm = TRUE)
+}" name="custom_r" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
