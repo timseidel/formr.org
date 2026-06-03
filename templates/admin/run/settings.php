@@ -315,8 +315,10 @@
                                                 <?php foreach ($reminders as $reminder): ?>
                                                     <div class="col-md-6 single_unit_display">
                                                         <form class="form-horizontal edit_run" enctype="multipart/form-data" name="edit_run" method="post" action="<?php echo admin_run_url($run->name); ?>" data-units='<?php echo json_encode($reminder['html_units']); ?>'>
-                                                            <a href="<?= admin_run_url($run->name, 'delete_run_unit?type=Email&special=ReminderEmail&redirect=settings:::reminder&unit_id=' . $reminder['id']) ?>" class="reminder-delete remove_unit_from_run" data-action="<?php echo admin_run_url($run->name); ?>" data-id="<?php echo $reminder['id']; ?>"><i class="fa fa-2x fa-trash"></i></a>
                                                             <div class="run_units"></div>
+                                                            <p class="text-right" style="margin: 10px 0 0;">
+                                                                <a href="<?= admin_run_url($run->name, 'delete_run_unit?type=Email&special=ReminderEmail&redirect=settings:::reminder&unit_id=' . $reminder['id']) ?>" class="btn btn-danger btn-xs remove_unit_from_run" data-action="<?php echo admin_run_url($run->name); ?>" data-id="<?php echo $reminder['id']; ?>"><i class="fa fa-trash"></i> Delete Reminder</a>
+                                                            </p>
                                                         </form>
                                                     </div>
                                                 <?php endforeach; ?>
