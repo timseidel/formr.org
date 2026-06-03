@@ -1270,11 +1270,13 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
     $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
 
     $custom_r = opencpu_custom_r();
+    if ($custom_r) {
+        $custom_r = 'eval(parse(text = ' . json_encode($custom_r) . '))' . "\n";
+    }
 
     $params = ['x' => '{ 
-' . ($custom_r ? $custom_r . "\n\n" : '') . '
 (function() {
-	library(formr)
+	' . $custom_r . '	library(formr)
 	' . $r_variables . '
 	' . $code . '
 })() }'];
