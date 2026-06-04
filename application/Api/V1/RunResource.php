@@ -207,7 +207,7 @@ class RunResource extends BaseResource
             'expire_cookie_unit' => $run->expire_cookie_unit,
             'custom_css' => $run->getCustomCSS(),
             'custom_js' => $run->getCustomJS(),
-            'custom_r' => $run->getCustomRFunctions(),
+            'custom_r' => opencpu_redact_secrets($run->getCustomRFunctions(), $run->getCustomRFunctions()),
             'manifest_json' => $run->getManifestJSON(),
         ];
 
