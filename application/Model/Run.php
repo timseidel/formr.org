@@ -1225,7 +1225,7 @@ class Run extends Model
             'cron_active' => (int) $this->cron_active,
             'custom_js' => $this->getCustomJS(),
             'custom_css' => $this->getCustomCSS(),
-            'custom_r' => $this->getCustomRFunctions(),
+            'custom_r' => opencpu_redact_secrets($this->getCustomRFunctions(), $this->getCustomRFunctions()),
             'expiresOn' => $this->expiresOn,
         );
 

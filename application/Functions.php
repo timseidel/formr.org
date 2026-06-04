@@ -66,9 +66,9 @@ function notify_user_error($error, $public_message = '')
     // that drives $show_errors='TRUE' in the OpenCPU knit chunks.
     if (!$run_session || $run_session->isCron() || $run_session->isTesting()) {
         if ($error instanceof Exception) {
-            $message .= $error->getMessage();
+            $message .= opencpu_redact_secrets($error->getMessage());
         } else {
-            $message .= $error;
+            $message .= opencpu_redact_secrets($error);
         }
     }
     alert($message, 'alert-danger');
@@ -1250,6 +1250,108 @@ function opencpu_custom_r()
 }
 
 /**
+ * Parse custom R code for secret variable definitions.
+ * Matches assignment patterns like secret_<name> <- "value" or secret_<name> = 'value'.
+ * Only captures string literals (not expressions or function calls).
+ *
+ * @param string $r_code The R source code to scan
+ * @return array Associative array of [var_name => raw_value]
+ */
+function opencpu_extract_secrets($r_code)
+{
+    $secrets = [];
+    if (empty($r_code)) {
+        return $secrets;
+    }
+
+    preg_match_all(
+        '/^[ \t]*secret_([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:<-|=)\s*"((?:[^"\\\\]|\\\\.)*)"\s*(?:#.*)?$/m',
+        $r_code,
+        $matches,
+        PREG_SET_ORDER
+    );
+    foreach ($matches as $m) {
+        $secrets['secret_' . $m[1]] = r_unescape($m[2]);
+    }
+
+    preg_match_all(
+        "/^[ \t]*secret_([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:<-|=)\s*'((?:[^'\\\\]|\\\\.)*)'\s*(?:#.*)?$/m",
+        $r_code,
+        $matches,
+        PREG_SET_ORDER
+    );
+    foreach ($matches as $m) {
+        $secrets['secret_' . $m[1]] = r_unescape($m[2]);
+    }
+
+    return $secrets;
+}
+
+/**
+ * Redact known secret values from a string.
+ *
+ * Replaces every occurrence of each secret value with "[SECRET REDACTED]".
+ * Only redacts values at least 6 characters long to avoid false positives
+ * on short strings that may appear commonly in output.
+ *
+ * When $custom_r is provided (e.g. from a Run context without a live
+ * RunSession), secrets are extracted from that source directly. Otherwise
+ * they are loaded from the currently active run session.
+ *
+ * @param string $text Text to redact secrets from
+ * @param string|null $custom_r Optional R source code to extract secrets from
+ * @return string Text with secret values replaced
+ */
+function opencpu_redact_secrets($text, $custom_r = null)
+{
+    if ($custom_r !== null) {
+        $secret_values = array_values(opencpu_extract_secrets($custom_r));
+    } else {
+        $custom_r = opencpu_custom_r();
+        $secret_values = $custom_r ? array_values(opencpu_extract_secrets($custom_r)) : [];
+    }
+
+    if (empty($secret_values)) {
+        return $text;
+    }
+
+    $to_redact = [];
+    foreach ($secret_values as $v) {
+        $v = (string) $v;
+        if (strlen($v) >= 6) {
+            $to_redact[] = $v;
+        }
+    }
+
+    if (empty($to_redact)) {
+        return $text;
+    }
+
+    return str_replace($to_redact, '[SECRET REDACTED]', $text);
+}
+
+/**
+ * Decode common R escape sequences in a string literal.
+ *
+ * Handles: \\, \", \', \n, \t, \r
+ *
+ * @param string $str Raw string content between R quotes
+ * @return string Unescaped string
+ */
+function r_unescape($str)
+{
+    $replacements = [
+        '\\\\' => '\\',
+        '\\"' => '"',
+        "\\'" => "'",
+        '\\n' => "\n",
+        '\\t' => "\t",
+        '\\r' => "\r",
+    ];
+    return strtr($str, $replacements);
+}
+
+/**
  * Execute a piece of code against OpenCPU
  *
  * @param string $code Each code line should be separated by a newline characted
@@ -1739,7 +1841,7 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
         $debug['Response'] = 'No OpenCPU_Session found. Server may be down.';
         if ($ocpu !== null) {
             $request = $ocpu->getRequest();
-            $debug['Request'] = (string) $request;
+            $debug['Request'] = opencpu_redact_secrets((string) $request);
             $reponse_info = $ocpu->getRequestInfo();
             $debug['Request Headers'] = pre_htmlescape(print_r($reponse_info['request_header'], 1));
         }
@@ -1751,14 +1853,14 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
             if (isset($params['text'])) {
                 $debug['R Markdown'] = '
 					<a href="#" class="download_r_code" data-filename="formr_rmarkdown.Rmd">Download R Markdown file to debug.</a><br>
-					<textarea class="form-control" rows="10" readonly>' . h(stripslashes(substr($params['text'], 1, -1))) . '</textarea>';
+					<textarea class="form-control" rows="10" readonly>' . h(opencpu_redact_secrets(stripslashes(substr($params['text'], 1, -1)))) . '</textarea>';
             } elseif (isset($params['x'])) {
                 $debug['R Code'] = '
 					<a href="#" class="download_r_code" data-filename="formr_values_showifs.R">Download R code file to debug.</a><br>
-					<textarea class="form-control" rows="10" readonly>' . h((substr($params['x'], 1, -1))) . '</textarea>';
+					<textarea class="form-control" rows="10" readonly>' . h(opencpu_redact_secrets(substr($params['x'], 1, -1))) . '</textarea>';
             }
             if ($session->hasError()) {
-                $debug['Response'] = pre_htmlescape($session->getError());
+                $debug['Response'] = pre_htmlescape(opencpu_redact_secrets($session->getError()));
             } else {
                 if (($files = $session->getFiles("knit.html"))) {
                     $iframesrc = $files['knit.html'];
@@ -1767,9 +1869,9 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
 						<a href="' . $iframesrc . '" target="_blank">Open in new window</a>
 					</p>';
                 } else if (isset($params['text']) || $rtype === 'text') {
-                    $debug['Response'] = stringBool($session->getObject('text'));
+                    $debug['Response'] = opencpu_redact_secrets(stringBool($session->getObject('text')));
                 } else {
-                    $debug['Response'] = pre_htmlescape(json_encode($session->getJSONObject(), JSON_PRETTY_PRINT + JSON_UNESCAPED_UNICODE));
+                    $debug['Response'] = pre_htmlescape(opencpu_redact_secrets(json_encode($session->getJSONObject(), JSON_PRETTY_PRINT + JSON_UNESCAPED_UNICODE)));
                 }
             }
 
@@ -1782,10 +1884,10 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
                 }
                 $debug['Locations'] = $locations;
             }
-            $debug['Session Info'] = pre_htmlescape($session->getInfo());
-            $debug['Session Console'] = pre_htmlescape($session->getConsole());
-            $debug['Session Stdout'] = pre_htmlescape($session->getStdout());
-            $debug['Request'] = pre_htmlescape((string) $request);
+            $debug['Session Info'] = pre_htmlescape(opencpu_redact_secrets($session->getInfo()));
+            $debug['Session Console'] = pre_htmlescape(opencpu_redact_secrets($session->getConsole()));
+            $debug['Session Stdout'] = pre_htmlescape(opencpu_redact_secrets($session->getStdout()));
+            $debug['Request'] = pre_htmlescape(opencpu_redact_secrets((string) $request));
 
             $reponse_headers = $session->getResponseHeaders();
             $debug['Response Headers'] = pre_htmlescape(print_r($reponse_headers, 1));
@@ -1808,7 +1910,7 @@ function opencpu_log($msg)
     } else {
         $log .= $msg;
     }
-    error_log($log . "\n", 3, get_log_file('opencpu.log'));
+    error_log(opencpu_redact_secrets($log) . "\n", 3, get_log_file('opencpu.log'));
 }
 
 function opencpu_formr_variables($q)
