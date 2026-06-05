@@ -117,7 +117,7 @@
                                                 <div class="form-group">
                                                     <label for="description">Description</label>
                                                     <p>Will be shown at the top of every page of the study. Optional.</p>
-                                                    <textarea data-editor="markdown" placeholder="Description" name="description" id="description" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->description); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Description" name="description" id="description" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->description); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -126,7 +126,7 @@
                                                 <div class="form-group">
                                                     <p>Your Imprint should contain information about who is responsible for the study, and how they can be contacted. It should also link to your privacy policy and in some cases to the settings page, where users can unsubscribe from emails and log out.</p>
                                                     <label title="Will be shown on every page of the run, good for contact info" for="footer_text">Imprint/Footer text</label>
-                                                    <textarea data-editor="markdown" placeholder="Footer text" name="footer_text" id="footer_text" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->footer_text); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Footer text" name="footer_text" id="footer_text" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->footer_text); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -135,7 +135,7 @@
                                                 <div class="form-group">
                                                     <label title="This will be the description of your study shown on the public page" for="public_blurb">Public blurb</label>
                                                     <p>This will be the description of your study shown on the <a href="<?php echo site_url("/public/studies"); ?>" target="_blank">public page</a>. Optional.</p>
-                                                    <textarea data-editor="markdown" placeholder="Blurb" name="public_blurb" id="public_blurb" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->public_blurb); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Blurb" name="public_blurb" id="public_blurb" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->public_blurb); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -195,7 +195,7 @@
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
-                                                    <textarea data-editor="css" placeholder="Enter your custom CSS here" name="custom_css" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomCSS()); ?></textarea>
+                                                    <textarea data-editor="css" placeholder="Enter your custom CSS here" name="custom_css" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomCSS()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -214,7 +214,7 @@
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
-                                                    <textarea data-editor="javascript" placeholder="Enter your custom JS here" name="custom_js" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomJS()); ?></textarea>
+                                                    <textarea data-editor="javascript" placeholder="Enter your custom JS here" name="custom_js" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomJS()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -241,7 +241,7 @@
                                                     <textarea data-editor="r" placeholder="# Custom R functions &mdash; callable by name in showif, value, feedback, etc.
 my_score <- function(data) {
     mean(data, na.rm = TRUE)
-}" name="custom_r" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
+}" name="custom_r" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
