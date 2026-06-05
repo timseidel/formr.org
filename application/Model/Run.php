@@ -792,6 +792,9 @@ class Run extends Model
     private $custom_r_cache = null;
     private $custom_r_loaded = false;
 
+    private $secrets_cache = null;
+    private $secrets_loaded = false;
+
     public function getCustomRFunctions()
     {
         if ($this->custom_r_loaded) {
@@ -802,6 +805,18 @@ class Run extends Model
             $this->custom_r_cache = $this->getFileContent($this->custom_r_path);
         }
         return $this->custom_r_cache;
+    }
+
+    public function getSecrets()
+    {
+        if ($this->secrets_loaded) {
+            return $this->secrets_cache;
+        }
+        $this->secrets_loaded = true;
+        if ($this->id) {
+            $this->secrets_cache = RunSecret::getSecretsForRun($this->id);
+        }
+        return $this->secrets_cache ?: array();
     }
 
     public function getManifestJSON()
@@ -916,6 +931,24 @@ class Run extends Model
             $posted['expire_cookie'] = $this->expire_cookie;
         }
         unset($posted['expire_cookie_value'], $posted['expire_cookie_unit']);
+
+        // Handle secrets before the main loop so they don't hit "Invalid setting"
+        if (isset($posted['secrets_json'])) {
+            $secrets = json_decode($posted['secrets_json'], true);
+            if (is_array($secrets)) {
+                RunSecret::setSecretsForRun($this->id, $secrets);
+            }
+            unset($posted['secrets_json']);
+        }
+
+        // The export bundle includes 'secrets' as an indexed array of key names
+        // (no values — they're encrypted per-run and cannot be transferred).
+        // Create placeholder entries so the admin sees which secrets need to
+        // be reconfigured after import.
+        if (isset($posted['secrets']) && is_array($posted['secrets'])) {
+            RunSecret::ensureSecretsExist($this->id, $posted['secrets']);
+            unset($posted['secrets']);
+        }
 
         $updates = array();
         foreach ($posted as $name => $value) {
@@ -1225,7 +1258,8 @@ class Run extends Model
             'cron_active' => (int) $this->cron_active,
             'custom_js' => $this->getCustomJS(),
             'custom_css' => $this->getCustomCSS(),
-            'custom_r' => opencpu_redact_secrets($this->getCustomRFunctions(), $this->getCustomRFunctions()),
+            'custom_r' => $this->getCustomRFunctions(),
+            'secrets' => array_keys($this->getSecrets()),
             'expiresOn' => $this->expiresOn,
         );
 
