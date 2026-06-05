@@ -1250,41 +1250,51 @@ function opencpu_custom_r()
 }
 
 /**
- * Parse custom R code for secret variable definitions.
- * Matches assignment patterns like secret_<name> <- "value" or secret_<name> = 'value'.
- * Only captures string literals (not expressions or function calls).
+ * Get secrets defined for the currently active run.
+ * Loaded from the survey_run_secrets table, decrypted via Crypto.
  *
- * @param string $r_code The R source code to scan
- * @return array Associative array of [var_name => raw_value]
+ * @return array Associative array of [name => plaintext_value]
  */
-function opencpu_extract_secrets($r_code)
+function opencpu_secrets()
 {
-    $secrets = [];
-    if (empty($r_code)) {
-        return $secrets;
+    $run_session = Site::getInstance()->getRunSession();
+    if ($run_session) {
+        $run = $run_session->getRun();
+        if ($run) {
+            return $run->getSecrets();
+        }
     }
 
-    preg_match_all(
-        '/^[ \t]*secret_([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:<-|=)\s*"((?:[^"\\\\]|\\\\.)*)"\s*(?:#.*)?$/m',
-        $r_code,
-        $matches,
-        PREG_SET_ORDER
-    );
-    foreach ($matches as $m) {
-        $secrets['secret_' . $m[1]] = r_unescape($m[2]);
+    return [];
+}
+
+/**
+ * Generate R code to inject secrets as .formr$ variables.
+ *
+ * Secrets are assigned to the hidden .formr$ environment so they are
+ * accessible in R as .formr$secret_<name> but do not appear in ls()
+ * output or pollute the global scope.
+ *
+ * @param array|null $secrets Optional secrets array; if null loaded from run
+ * @return string R code assigning each secret
+ */
+function opencpu_inject_secrets($secrets = null)
+{
+    if ($secrets === null) {
+        $secrets = opencpu_secrets();
     }
 
-    preg_match_all(
-        "/^[ \t]*secret_([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:<-|=)\s*'((?:[^'\\\\]|\\\\.)*)'\s*(?:#.*)?$/m",
-        $r_code,
-        $matches,
-        PREG_SET_ORDER
-    );
-    foreach ($matches as $m) {
-        $secrets['secret_' . $m[1]] = r_unescape($m[2]);
+    if (empty($secrets)) {
+        return '';
     }
 
-    return $secrets;
+    $code = '';
+    foreach ($secrets as $name => $value) {
+        $escaped = "'" . addcslashes((string) $value, "'\\") . "'";
+        $code .= ".formr\$secret_{$name} = {$escaped}\n";
+    }
+
+    return $code;
 }
 
 /**
@@ -1294,31 +1304,25 @@ function opencpu_extract_secrets($r_code)
  * Only redacts values at least 6 characters long to avoid false positives
  * on short strings that may appear commonly in output.
  *
- * When $custom_r is provided (e.g. from a Run context without a live
- * RunSession), secrets are extracted from that source directly. Otherwise
- * they are loaded from the currently active run session.
- *
  * @param string $text Text to redact secrets from
- * @param string|null $custom_r Optional R source code to extract secrets from
+ * @param array|null $known_secrets Optional pre-loaded secrets array; if null loaded from run
  * @return string Text with secret values replaced
  */
-function opencpu_redact_secrets($text, $custom_r = null)
+function opencpu_redact_secrets($text, $known_secrets = null)
 {
-    if ($custom_r !== null) {
-        $secret_values = array_values(opencpu_extract_secrets($custom_r));
-    } else {
-        $custom_r = opencpu_custom_r();
-        $secret_values = $custom_r ? array_values(opencpu_extract_secrets($custom_r)) : [];
+    if ($known_secrets === null) {
+        $known_secrets = opencpu_secrets();
     }
 
-    if (empty($secret_values)) {
+    $values = array_values($known_secrets);
+    if (empty($values)) {
         return $text;
     }
 
     $to_redact = [];
-    foreach ($secret_values as $v) {
+    foreach ($values as $v) {
         $v = (string) $v;
-        if (strlen($v) >= 6) {
+        if ($v !== '') {
             $to_redact[] = $v;
         }
     }
@@ -1328,27 +1332,6 @@ function opencpu_redact_secrets($text, $custom_r = null)
     }
 
     return str_replace($to_redact, '[SECRET REDACTED]', $text);
-}
-
-/**
- * Decode common R escape sequences in a string literal.
- *
- * Handles: \\, \", \', \n, \t, \r
- *
- * @param string $str Raw string content between R quotes
- * @return string Unescaped string
- */
-function r_unescape($str)
-{
-    $replacements = [
-        '\\\\' => '\\',
-        '\\"' => '"',
-        "\\'" => "'",
-        '\\n' => "\n",
-        '\\t' => "\t",
-        '\\r' => "\r",
-    ];
-    return strtr($str, $replacements);
 }
 
 /**
@@ -1376,10 +1359,12 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
         $custom_r = 'eval(parse(text = ' . json_encode($custom_r) . '))' . "\n";
     }
 
+    $r_secrets = opencpu_inject_secrets();
+
     $params = ['x' => '{ 
 (function() {
 	' . $custom_r . '	library(formr)
-	' . $r_variables . '
+	' . $r_secrets . '	' . $r_variables . '
 	' . $code . '
 })() }'];
 
@@ -1473,10 +1458,11 @@ function opencpu_knit_plaintext($source, $variables = null, $return_session = fa
     }
 
     $custom_r = opencpu_custom_r();
+    $r_secrets = opencpu_inject_secrets();
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '
+' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1579,6 +1565,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     }
 
     $custom_r = opencpu_custom_r();
+    $r_secrets = opencpu_inject_secrets();
 
     // include=FALSE on the settings chunk: the chunk's R code still runs
     // (library() / opts_chunk$set() / variable assignments), but the chunk
@@ -1593,7 +1580,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     $source = $yaml .
         '```{r settings,include=FALSE}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '
+' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
 ```
@@ -1650,10 +1637,11 @@ function opencpu_knitdisplay($source, $variables = null, $return_session = false
     }
 
     $custom_r = opencpu_custom_r();
+    $r_secrets = opencpu_inject_secrets();
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '
+' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1687,10 +1675,11 @@ function opencpu_knitadmin($source, $variables = null, $return_session = false)
     }
 
     $custom_r = opencpu_custom_r();
+    $r_secrets = opencpu_inject_secrets();
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '
+' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1723,10 +1712,11 @@ function opencpu_knit_email($source, array $variables = null, $return_format = '
     }
 
     $custom_r = opencpu_custom_r();
+    $r_secrets = opencpu_inject_secrets();
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '
+' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.retina=2)
 opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' . $variables . '
@@ -1788,12 +1778,12 @@ function opencpu_multistring_parse(UnitSession $unitSession, array $string_templ
 }
 
 /**
- * Substitute parsed strings in the collection of items that were sent for parsing
- * This function does not return anything as the collection of items is passed by reference
- * For objects having the property 'label_parsed', they are checked and substituted
+ * Redact known secret values from a given text. Replaces all occurrences
+ * of secret values with the placeholder.
  *
- * @param array $array An array of data contaning label templates
- * @param array $parsed_strings An array of parsed labels
+ * @param string $text Text to redact secrets from
+ * @param array|null $known_secrets Optional pre-loaded secrets array; if null loaded from run
+ * @return string Text with secret values replaced
  */
 function opencpu_substitute_parsed_strings(array &$array, array $parsed_strings)
 {
@@ -1960,7 +1950,7 @@ function opencpu_last_error()
 {
     global $opencpu_session;
     if ($opencpu_session !== null) {
-        return $opencpu_session->getError();
+        return opencpu_redact_secrets($opencpu_session->getError());
     }
     return null;
 }

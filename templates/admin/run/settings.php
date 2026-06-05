@@ -26,7 +26,8 @@
                                 <li><a href="#privacy" data-toggle="tab" aria-expanded="false">Privacy</a></li>
                                 <li><a href="#css" data-toggle="tab" aria-expanded="false">CSS</a></li>
                                 <li><a href="#js" data-toggle="tab" aria-expanded="false">JS</a></li>
-                                <li><a href="#r-functions-secrets" data-toggle="tab" aria-expanded="false">R Functions &amp; Secrets</a></li>
+                                <li><a href="#r-functions" data-toggle="tab" aria-expanded="false">R Functions</a></li>
+                                <li><a href="#secrets" data-toggle="tab" aria-expanded="false">R Secrets</a></li>
                                 <li><a href="#manifest" data-toggle="tab" aria-expanded="false">App</a></li>
                                 <li><a href="#service_message" data-toggle="tab" aria-expanded="false">Service message</a></li>
                                 <li><a href="#reminder" data-toggle="tab" aria-expanded="false">Reminder</a></li>
@@ -192,12 +193,12 @@
                                     <div class="clear clearfix"></div>
                                 </div>
                                 <!-- /.tab-pane -->
-                                <div class="tab-pane" id="r-functions-secrets">
+                                <div class="tab-pane" id="r-functions">
                                     <form enctype="multipart/form-data" method="post" action="<?php echo admin_run_url($run->name, 'ajax_save_settings'); ?>">
                                         <p class="pull-right">
                                             <input type="submit" name="submit_settings" value="Save" class="btn btn-primary save_settings">
                                         </p>
-                                        <h4 class="lead"><i class="fa fa-cog"></i> R Functions &amp; Secrets</h4>
+                                        <h4 class="lead"><i class="fa fa-cog"></i> R Functions</h4>
                                         <p>
                                             Define custom R functions and global variables here. They are injected before every R evaluation
                                             in this run (showif, value, feedback, <code>relative_to</code>, branch conditions,
@@ -206,27 +207,62 @@
                                             To access run data (survey results, <code>survey_unit_sessions</code>, etc.), pass them
                                             as arguments &mdash; functions cannot directly see variables defined in inline R code.
                                         </p>
-                                        <p class="text-info">
-                                            <i class="fa fa-lock"></i> <strong>Secrets:</strong> Define sensitive values (API keys, tokens, passwords)
-                                            as string literals with a <code>secret_</code> prefix. They are <strong>automatically redacted</strong>
-                                            from all logs, debug output, error messages, run exports, and API responses. The value
-                                            must be a plain string literal (no expressions) and at least 6 characters.
-                                        </p>
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
                                                     <textarea data-editor="r" placeholder="# Custom R functions &mdash; callable by name in showif, value, feedback, etc.
 my_score <- function(data) {
     mean(data, na.rm = TRUE)
-}
-
-# Secrets &mdash; auto-redacted from logs, errors, exports, and API responses
-secret_api_key <- &quot;sk-proj-xxxxxxxxxxxx&quot;
-secret_db_pass  &lt;- &quot;hunter2&quot;" name="custom_r" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
+}" name="custom_r" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
                                     </form>
+                                </div>
+                                <!-- /.tab-pane -->
+                                <div class="tab-pane" id="secrets">
+                                    <div id="secrets-alerts"></div>
+                                    <h4 class="lead"><i class="fa fa-lock"></i> Secrets</h4>
+                                    <p>
+                                        Define sensitive values (API keys, tokens, passwords) here. They are <strong>encrypted at rest</strong>
+                                        in the database and <strong>automatically redacted</strong> from all logs, debug output, error messages,
+                                        run exports, and API responses. Changes are saved immediately.
+                                    </p>
+                                    <p>
+                                        In your R code (showif, value, feedback, etc.), access secrets as
+                                        <code>.formr$secret_&lt;name&gt;</code> &mdash; for example, a secret named
+                                        <code>api_key</code> is available as <code>.formr$secret_api_key</code>.
+                                    </p>
+                                    <div id="secrets-save-indicator" class="text-muted" style="visibility: hidden; height: 22px; margin-bottom: 10px;"><i class="fa fa-spinner fa-spin"></i> Saving...</div>
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <table class="table table-striped" id="secrets-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Value</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                    <tbody id="secrets-tbody">
+                                                    <?php foreach ($run->getSecrets() as $name => $value): ?>
+                                                    <tr>
+                                                        <td><code>secret_<?= h($name) ?></code></td>
+                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="<?= h($value) ?>"><button type="button" class="secret-toggle" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>
+                                                        <td><button type="button" class="btn btn-danger btn-xs delete-secret" title="Delete secret"><i class="fa fa-trash"></i></button></td>
+                                                    </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr>
+                                                        <td><input type="text" id="new-secret-name" class="form-control input-sm" placeholder="e.g. api_key"></td>
+                                                        <td><input type="text" id="new-secret-value" class="form-control input-sm" placeholder="Secret value"></td>
+                                                        <td><button type="button" id="add-secret-btn" class="btn btn-primary btn-xs"><i class="fa fa-plus"></i></button></td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
                                 <!-- /.tab-pane -->
                                 <div class="tab-pane" id="manifest">
@@ -439,6 +475,165 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
     <!-- /.content -->
 </div>
 
+<style>
+.secret-value-wrap {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+.secret-value-wrap .secret-value {
+    flex: 1;
+    padding-right: 30px;
+}
+.secret-value-wrap .secret-toggle {
+    position: absolute;
+    right: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    padding: 4px 6px;
+}
+.secret-value-wrap .secret-toggle:hover {
+    color: #333;
+}
+.secret-masked {
+    -webkit-text-security: disc;
+}
+#secrets-table td {
+    vertical-align: middle;
+}
+#secrets-table tfoot td {
+    border-top: 2px solid #ddd;
+}
+#secrets-table tfoot td:first-child {
+    width: 35%;
+}
+#secrets-table tfoot td:nth-child(2) {
+    width: 50%;
+}
+#secrets-table tfoot td:last-child {
+    width: 15%;
+}
+</style>
+<script>
+(function() {
+    var tbody = document.getElementById('secrets-tbody');
+    var saveUrl = '<?php echo admin_run_url($run->name, 'ajax_save_settings'); ?>';
+    var saveIndicator = document.getElementById('secrets-save-indicator');
+    var alertsContainer = document.getElementById('secrets-alerts');
+
+    function collectSecrets() {
+        var secrets = {};
+        var rows = tbody.querySelectorAll('tr');
+        rows.forEach(function(row) {
+            var nameInput = row.querySelector('.secret-name-hidden');
+            var valueInput = row.querySelector('.secret-value');
+            if (nameInput && valueInput) {
+                var name = nameInput.value.trim();
+                if (name) {
+                    secrets[name] = valueInput.value;
+                }
+            }
+        });
+        return secrets;
+    }
+
+    function hasName(name) {
+        var rows = tbody.querySelectorAll('tr');
+        var found = false;
+        rows.forEach(function(row) {
+            var input = row.querySelector('.secret-name-hidden');
+            if (input && input.value.trim() === name) {
+                found = true;
+            }
+        });
+        return found;
+    }
+
+    function saveSecrets() {
+        var secrets = collectSecrets();
+        saveIndicator.style.visibility = 'visible';
+
+        var formData = new FormData();
+        formData.append('secrets_json', JSON.stringify(secrets));
+
+        fetch(saveUrl, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                saveIndicator.innerHTML = '<i class="fa fa-check"></i> Saved';
+                if (html.indexOf('alert-danger') !== -1) {
+                    alertsContainer.innerHTML = html;
+                }
+                setTimeout(function() {
+                    saveIndicator.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+                    saveIndicator.style.visibility = 'hidden';
+                }, 1200);
+            })
+            .catch(function() {
+                saveIndicator.style.visibility = 'hidden';
+                alertsContainer.innerHTML = '<div class="alert alert-danger">Failed to save secrets.</div>';
+            });
+    }
+
+    // Toggle secret visibility via eye button
+    tbody.addEventListener('click', function(e) {
+        var btn = e.target.closest('.secret-toggle');
+        if (btn) {
+            var wrap = btn.closest('.secret-value-wrap');
+            if (!wrap) return;
+            var input = wrap.querySelector('.secret-value');
+            if (!input) return;
+            input.classList.toggle('secret-masked');
+            btn.querySelector('i').className = input.classList.contains('secret-masked') ? 'fa fa-eye' : 'fa fa-eye-slash';
+            return;
+        }
+
+        // Delete secret row + auto-save
+        var del = e.target.closest('.delete-secret');
+        if (del) {
+            del.closest('tr').remove();
+            saveSecrets();
+        }
+    });
+
+    // Auto-save on value change (blur)
+    tbody.addEventListener('blur', function(e) {
+        var input = e.target.closest('.secret-value');
+        if (input) {
+            saveSecrets();
+        }
+    }, true);
+
+    // Add new secret + auto-save
+    document.getElementById('add-secret-btn').addEventListener('click', function() {
+        var nameInput = document.getElementById('new-secret-name');
+        var valueInput = document.getElementById('new-secret-value');
+        var name = nameInput.value.trim();
+        var value = valueInput.value.trim();
+
+        if (!name) { alert('Please enter a secret name.'); return; }
+        if (!value) { alert('Please enter a secret value.'); return; }
+        if (hasName(name)) {
+            alert('A secret with this name already exists.');
+            return;
+        }
+
+        var safeName = name.replace(/[<>&"']/g, '');
+        var safeValue = value.replace(/[<>&"']/g, '');
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td><code>secret_' + safeName + '</code></td>' +
+            '<td><input type="hidden" class="secret-name-hidden" value="' + safeName + '"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="' + safeValue + '"><button type="button" class="secret-toggle" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>' +
+            '<td><button type="button" class="btn btn-danger btn-xs delete-secret" title="Delete secret"><i class="fa fa-trash"></i></button></td>';
+        tbody.appendChild(tr);
+
+        nameInput.value = '';
+        valueInput.value = '';
+        saveSecrets();
+    });
+})();
+</script>
 <?php
 Template::loadChild('admin/run/run_modals', array('reminders' => array()));
 Template::loadChild('admin/footer');
