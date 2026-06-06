@@ -276,8 +276,8 @@ my_score <- function(data) {
                                                     <?php foreach ($run->getSecrets() as $name => $value): ?>
                                                     <tr>
                                                         <td><code>secret_<?= h($name) ?></code></td>
-                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="<?= h($value) ?>"><button type="button" class="secret-toggle" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>
-                                                        <td><button type="button" class="btn btn-danger btn-xs delete-secret" title="Delete secret"><i class="fa fa-trash"></i></button></td>
+                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="<?= h($value) ?>"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>
+                                                        <td><button type="button" class="btn btn-danger btn-xs delete-secret" data-toggle="tooltip" title="Delete secret"><i class="fa fa-trash"></i></button></td>
                                                     </tr>
                                                     <?php endforeach; ?>
                                                 </tbody>
@@ -565,6 +565,8 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
     var saveIndicator = document.getElementById('secrets-save-indicator');
     var alertsContainer = document.getElementById('secrets-alerts');
 
+    jQuery('[data-toggle="tooltip"]').tooltip();
+
     function collectSecrets() {
         var secrets = {};
         var rows = tbody.querySelectorAll('tr');
@@ -634,6 +636,7 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
         // Delete secret row + auto-save
         var del = e.target.closest('.delete-secret');
         if (del) {
+            jQuery(del).tooltip('destroy');
             del.closest('tr').remove();
             saveSecrets();
         }
@@ -666,9 +669,10 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
         var tr = document.createElement('tr');
         tr.innerHTML =
             '<td><code>secret_' + safeName + '</code></td>' +
-            '<td><input type="hidden" class="secret-name-hidden" value="' + safeName + '"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="' + safeValue + '"><button type="button" class="secret-toggle" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>' +
-            '<td><button type="button" class="btn btn-danger btn-xs delete-secret" title="Delete secret"><i class="fa fa-trash"></i></button></td>';
+            '<td><input type="hidden" class="secret-name-hidden" value="' + safeName + '"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="' + safeValue + '"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>' +
+            '<td><button type="button" class="btn btn-danger btn-xs delete-secret" data-toggle="tooltip" title="Delete secret"><i class="fa fa-trash"></i></button></td>';
         tbody.appendChild(tr);
+        jQuery(tr).find('[data-toggle="tooltip"]').tooltip();
 
         nameInput.value = '';
         valueInput.value = '';
