@@ -1239,14 +1239,23 @@ function opencpu_prepare_api_access($code, &$variables)
  */
 function opencpu_custom_r()
 {
-    $run_session = Site::getInstance()->getRunSession();
+    $run_session = run_session();
+    if (!$run_session) {
+        $run_session = Site::getInstance()->getRunSession();
+    }
+
+    $run = null;
     if ($run_session) {
         $run = $run_session->getRun();
-        if ($run) {
-            return $run->getCustomRFunctions();
-        }
     }
-    return '';
+    if (!$run) {
+        $run = Site::getInstance()->getRun();
+    }
+    if (!$run) {
+        return '';
+    }
+
+    return $run->getCustomRFunctions();
 }
 
 /**
@@ -1257,28 +1266,43 @@ function opencpu_custom_r()
  */
 function opencpu_secrets()
 {
-    $run_session = Site::getInstance()->getRunSession();
-    if ($run_session) {
-        $run = $run_session->getRun();
-        if ($run) {
-            return $run->getSecrets();
-        }
+    $run_session = run_session();
+    if (!$run_session) {
+        $run_session = Site::getInstance()->getRunSession();
     }
 
-    return [];
+    $run = null;
+    if ($run_session) {
+        $run = $run_session->getRun();
+    }
+    if (!$run) {
+        $run = Site::getInstance()->getRun();
+    }
+    if (!$run) {
+        return [];
+    }
+
+    return $run->getSecrets();
 }
 
 /**
  * Generate R code to inject secrets as .formr$ variables.
  *
+ * Only injects secrets whose `.formr$secret_<name>` reference appears in
+ * the R code, matching the conditional-injection pattern used by data
+ * variables and API tokens. Secrets referenced via string construction
+ * (e.g. `paste0(".formr$secret_", var)`) are not detected — use the
+ * literal `.formr$secret_<name>` form.
+ *
  * Secrets are assigned to the hidden .formr$ environment so they are
  * accessible in R as .formr$secret_<name> but do not appear in ls()
  * output or pollute the global scope.
  *
- * @param array|null $secrets Optional secrets array; if null loaded from run
- * @return string R code assigning each secret
+ * @param string $q The R code or R Markdown source to scan for secret references.
+ * @param array|null $secrets Optional secrets array; if null loaded from run.
+ * @return string R code assigning each referenced secret.
  */
-function opencpu_inject_secrets($secrets = null)
+function opencpu_inject_secrets($q, $secrets = null)
 {
     if ($secrets === null) {
         $secrets = opencpu_secrets();
@@ -1290,6 +1314,9 @@ function opencpu_inject_secrets($secrets = null)
 
     $code = '';
     foreach ($secrets as $name => $value) {
+        if (strpos((string) $q, ".formr\$secret_{$name}") === false) {
+            continue;
+        }
         $escaped = "'" . addcslashes((string) $value, "'\\") . "'";
         $code .= ".formr\$secret_{$name} = {$escaped}\n";
     }
@@ -1359,7 +1386,7 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
         $custom_r = 'eval(parse(text = ' . json_encode($custom_r) . '))' . "\n";
     }
 
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($code);
 
     $params = ['x' => '{ 
 (function() {
@@ -1458,7 +1485,7 @@ function opencpu_knit_plaintext($source, $variables = null, $return_session = fa
     }
 
     $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
@@ -1556,6 +1583,12 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
         $show_warnings = 'TRUE';
     }
 
+    // Save the original source so we can scan it for secret references
+    // before YAML extraction removes the frontmatter. Secret references in
+    // YAML are not a realistic concern (YAML is markdown metadata, not R
+    // code), but scanning the full original text is more defensive.
+    $source_with_yaml = $source;
+
     $yaml = "";
     $yaml_lines = '/^\-\-\-/um';
     if (preg_match_all($yaml_lines, (string)$source) >= 2) {
@@ -1565,7 +1598,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     }
 
     $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($source_with_yaml);
 
     // include=FALSE on the settings chunk: the chunk's R code still runs
     // (library() / opts_chunk$set() / variable assignments), but the chunk
@@ -1637,7 +1670,7 @@ function opencpu_knitdisplay($source, $variables = null, $return_session = false
     }
 
     $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
@@ -1675,7 +1708,7 @@ function opencpu_knitadmin($source, $variables = null, $return_session = false)
     }
 
     $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
@@ -1712,7 +1745,7 @@ function opencpu_knit_email($source, array $variables = null, $return_format = '
     }
 
     $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets();
+    $r_secrets = opencpu_inject_secrets($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
