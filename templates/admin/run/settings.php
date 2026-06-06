@@ -741,12 +741,12 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
 
             var saveHtml = await saveRes.text();
             if (saveHtml) {
-                var heading = document.getElementById('app_heading');
-                if (heading) {
+                var pane = rForm.closest('.tab-pane');
+                if (pane) {
                     var tmp = document.createElement('div');
                     tmp.innerHTML = saveHtml;
                     while (tmp.firstChild) {
-                        heading.parentNode.insertBefore(tmp.firstChild, heading.nextSibling);
+                        pane.insertBefore(tmp.firstChild, pane.firstChild);
                     }
                 }
             }
