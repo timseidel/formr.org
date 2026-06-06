@@ -252,14 +252,24 @@ my_score <- function(data) {
                                     <div id="secrets-alerts"></div>
                                     <h4 class="lead"><i class="fa fa-lock"></i> Secrets</h4>
                                     <p>
-                                        Define sensitive values (API keys, tokens, passwords) here. They are <strong>encrypted at rest</strong>
-                                        in the database and <strong>automatically redacted</strong> from all logs, debug output, error messages,
+                                        Define sensitive values (API keys, tokens, passwords) here. They are <strong>stored encrypted</strong>
+                                        in the database and <strong>automatically hidden</strong> from all logs, debug output, error messages,
                                         run exports, and API responses. Changes are saved immediately.
                                     </p>
                                     <p>
-                                        In your R code (showif, value, feedback, etc.), access secrets as
+                                        In your R code (showif, value, label, body, subject, condition, etc.), access a secret as
                                         <code>.formr$secret_&lt;name&gt;</code> &mdash; for example, a secret named
                                         <code>api_key</code> is available as <code>.formr$secret_api_key</code>.
+                                        Secrets are <strong>only sent to the R environment</strong> when your code literally contains
+                                        that <code>.formr$secret_&lt;name&gt;</code> reference — unused secrets stay in the database
+                                        and are never transmitted to OpenCPU. References constructed dynamically at runtime
+                                        (e.g. <code>get(paste0(".formr$secret_", var))</code>) won't trigger injection;
+                                        always use the literal <code>.formr$secret_&lt;name&gt;</code> form.
+                                    </p>
+                                    <p class="text-muted small">
+                                        <i class="fa fa-info-circle"></i> This is <strong>not</strong> where to put your formr v1 API secret.
+                                        The formr API uses OAuth2 access tokens generated automatically via
+                                        <code>formr_api_authenticate()</code> &mdash; no manual secret entry needed.
                                     </p>
                                     <div id="secrets-save-indicator" class="text-muted" style="visibility: hidden; height: 22px; margin-bottom: 10px;"><i class="fa fa-spinner fa-spin"></i> Saving...</div>
                                     <div class="row">
