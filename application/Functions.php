@@ -1362,6 +1362,35 @@ function opencpu_redact_secrets($text, $known_secrets = null)
 }
 
 /**
+ * Check whether R code is syntactically valid by calling base::parse() on OpenCPU.
+ *
+ * Runs R's built-in parser (which only checks syntax, not semantics).
+ * The code is NOT executed — parse() returns an expression object.
+ *
+ * @param string $code The R code to validate
+ * @return array{valid: bool|null, message: string}
+ *               valid=true  → syntax is valid
+ *               valid=false → syntax error, message contains the R error
+ *               valid=null  → OpenCPU unreachable, message explains
+ */
+function opencpu_validate_r_code(string $code): array {
+    if (trim($code) === '') {
+        return ['valid' => true, 'message' => ''];
+    }
+    try {
+        $session = OpenCPU::getInstance()->post('/base/R/parse', ['text' => json_encode($code)]);
+        if ($session->hasError()) {
+            $msg = $session->getError();
+            $msg = preg_replace('/^R Error: /', '', $msg);
+            return ['valid' => false, 'message' => $msg];
+        }
+        return ['valid' => true, 'message' => ''];
+    } catch (OpenCPU_Exception $e) {
+        return ['valid' => null, 'message' => 'Could not contact OpenCPU server to validate R code.'];
+    }
+}
+
+/**
  * Execute a piece of code against OpenCPU
  *
  * @param string $code Each code line should be separated by a newline characted

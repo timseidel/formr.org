@@ -224,7 +224,7 @@
                                 <div class="tab-pane" id="r-functions">
                                     <form enctype="multipart/form-data" method="post" action="<?php echo admin_run_url($run->name, 'ajax_save_settings'); ?>">
                                         <p class="pull-right">
-                                            <input type="submit" name="submit_settings" value="Save" class="btn btn-primary save_settings">
+                                            <button type="button" class="btn btn-primary btn-save-test-r-code">Save &amp; Test R Syntax</button>
                                         </p>
                                         <h4 class="lead"><i class="fa fa-cog"></i> R Functions</h4>
                                         <p>
@@ -235,6 +235,7 @@
                                             To access run data (survey results, <code>survey_unit_sessions</code>, etc.), pass them
                                             as arguments &mdash; functions cannot directly see variables defined in inline R code.
                                         </p>
+                                        <div id="r-code-parse-result"></div>
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
@@ -660,6 +661,14 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
         }
     }, true);
 
+    // Enter key in name/value fields triggers add
+    document.getElementById('new-secret-name').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-secret-btn').click(); }
+    });
+    document.getElementById('new-secret-value').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-secret-btn').click(); }
+    });
+
     // Add new secret + auto-save
     document.getElementById('add-secret-btn').addEventListener('click', function() {
         var nameInput = document.getElementById('new-secret-name');
@@ -686,7 +695,102 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
 
         nameInput.value = '';
         valueInput.value = '';
+        nameInput.focus();
         saveSecrets();
+    });
+})();
+
+// --- Save & test R Syntax ---
+(function() {
+    var rForm = document.querySelector('#r-functions form');
+    var resultEl = document.getElementById('r-code-parse-result');
+    var validateUrl = '<?php echo admin_run_url($run->name, 'ajax_validate_r_code'); ?>';
+    if (!rForm || !resultEl) return;
+
+    var busy = false;
+    var lastCode = '';
+    var lastError = '';
+
+    function escapeHtml(text) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(text));
+        return d.innerHTML;
+    }
+
+    rForm.querySelector('.btn-save-test-r-code').addEventListener('click', async function() {
+        if (busy) return;
+        busy = true;
+        jQuery(rForm).trigger('ajax_submission');
+        var textarea = rForm.querySelector('textarea[name="custom_r"]');
+        if (!textarea) { busy = false; return; }
+        var code = textarea.value;
+
+        resultEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+
+        try {
+            var saveRes = await fetch(rForm.action, {
+                method: 'POST',
+                body: new FormData(rForm),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!saveRes.ok) {
+                busy = false;
+                resultEl.innerHTML = '<span class="text-warning"><i class="fa fa-warning"></i> Save failed</span>';
+                return;
+            }
+
+            var saveHtml = await saveRes.text();
+            if (saveHtml) {
+                var heading = document.getElementById('app_heading');
+                if (heading) {
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = saveHtml;
+                    while (tmp.firstChild) {
+                        heading.parentNode.insertBefore(tmp.firstChild, heading.nextSibling);
+                    }
+                }
+            }
+
+            if (code.trim() === '') {
+                busy = false;
+                resultEl.innerHTML = '';
+                return;
+            }
+
+            resultEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Checking syntax…';
+            var fd = new FormData();
+            fd.append('r_code', code);
+            var checkRes = await fetch(validateUrl, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            var data = await checkRes.json();
+            busy = false;
+
+            if (data.valid === true) {
+                resultEl.innerHTML = '<span class="text-success"><i class="fa fa-check"></i> R syntax is valid</span>';
+            } else if (data.valid === false) {
+                lastCode = code;
+                lastError = data.message;
+                resultEl.innerHTML = '<pre class="text-danger" style="white-space: pre-wrap; margin: 8px 0">'
+                    + escapeHtml(data.message)
+                    + '</pre>'
+                    + '<div style="margin: 6px 0"><p class="pull-right"><button type="button" class="btn btn-sm btn-default" title="Copy code + error for LLM"><i class="fa fa-clipboard"></i> Copy for LLM</button></p></div>';
+                var copyBtn = resultEl.querySelector('button');
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', function() {
+                        var text = 'TASK: Debug this R code syntax error.\n\nCODE:\n' + lastCode + '\n\nERROR:\n' + lastError;
+                        navigator.clipboard.writeText(text);
+                    });
+                }
+            } else {
+                resultEl.innerHTML = '<span class="text-warning"><i class="fa fa-warning"></i> ' + (data.message || 'Could not validate') + '</span>';
+            }
+        } catch (e) {
+            busy = false;
+            resultEl.innerHTML = '<span class="text-warning"><i class="fa fa-warning"></i> Save or syntax check failed</span>';
+        }
     });
 })();
 </script>
