@@ -44,6 +44,13 @@ $settings['alternative_opencpu_instance'] = array(
 	'r_lib_path' => '/usr/local/lib/R/site-library'
 );
 
+// Internal URL for R→formr API calls from OpenCPU (Docker bridge network).
+// When set, `.formr$host` uses this instead of the public `api_base_url()`,
+// avoiding DNS, TLS, and reverse-proxy overhead on every `formr_api_*()` call.
+// Example: 'http://formr_app/api' (same Docker network as opencpu).
+// Leave empty to fall back to `api_base_url()` (current behaviour).
+$settings['api_internal_url'] = '';
+
 // email SMTP and queueing configuration for emails sent by the formr app itself
 // for example for email confirmation and password reset
 $settings['email'] = array(
