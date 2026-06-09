@@ -1214,7 +1214,7 @@ function opencpu_prepare_api_access($code, &$variables)
     // code. The R-side helpers (formr_api_authenticate, formr_api_results)
     // read these from `.formr$` as their auto-pickup source.
     $access_token = "'" . addcslashes($token_data['access_token'], "'\\") . "'";
-    $host = "'" . addcslashes(Config::get('api_internal_url') ?: api_base_url(), "'\\") . "'";
+    $host = "'" . addcslashes(rtrim(Config::get('api_internal_url'), '/') ?: api_base_url(), "'\\") . "'";
     $run_name = "'" . addcslashes($run->name, "'\\") . "'";
 
     if (is_string($variables)) {
