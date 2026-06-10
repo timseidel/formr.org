@@ -1379,6 +1379,19 @@ function opencpu_redact_secrets($text, $known_secrets = null)
         return $text;
     }
 
+    // Escaped variants too, not just the raw value. Debug output shows the
+    // secret at several encoding depths: the R Markdown panel carries the
+    // R single-quoted form written by opencpu_inject_secrets (' -> \'),
+    // the Request panel carries that form JSON-encoded again into the
+    // `text` param (\\' and \"), and request bodies can be URL-encoded.
+    // Close over compositions of those escapers to depth 2 — a literal
+    // match on the raw value alone misses every one of them.
+    $transforms = [
+        function ($s) { return addcslashes($s, "'\\\n\r"); }, // opencpu_inject_secrets form
+        function ($s) { return addslashes($s); },              // OpenCPU_Request::__toString escapes ' " \
+        function ($s) { return trim(json_encode($s, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), '"'); },
+        function ($s) { return rawurlencode($s); },
+    ];
     $to_redact = [];
     foreach ($values as $v) {
         $v = (string) $v;
@@ -1387,16 +1400,22 @@ function opencpu_redact_secrets($text, $known_secrets = null)
         if (mb_strlen($v) < 6) {
             continue;
         }
-        // Escaped variants too, not just the raw value: the source shown
-        // by opencpu_debug contains the R single-quoted form written by
-        // opencpu_inject_secrets (' -> \'), and error messages quoting
-        // request payloads contain the JSON-encoded form. A secret with a
-        // quote in it would otherwise sail through the literal match.
-        $to_redact[] = addcslashes($v, "'\\\n\r");
-        $to_redact[] = trim(json_encode($v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), '"');
-        $to_redact[] = $v;
+        $variants = [$v];
+        for ($depth = 0; $depth < 2; $depth++) {
+            $next = $variants;
+            foreach ($variants as $base) {
+                foreach ($transforms as $t) {
+                    $next[] = $t($base);
+                }
+            }
+            $variants = array_unique($next);
+        }
+        $to_redact = array_merge($to_redact, $variants);
     }
     $to_redact = array_values(array_unique($to_redact));
+    // longest first, so a deeper-escaped variant isn't partially mangled
+    // by an earlier replacement of a shorter one it contains
+    usort($to_redact, function ($a, $b) { return strlen($b) - strlen($a); });
 
     if (empty($to_redact)) {
         return $text;

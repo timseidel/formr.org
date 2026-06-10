@@ -91,6 +91,27 @@ class RunSecretsFunctionsTest extends TestCase
         $json_text = 'request was ' . json_encode(['x' => 'it\'s&a"key<>123']);
         $redacted_json = opencpu_redact_secrets($json_text, $secrets);
         $this->assertStringNotContainsString('key<>123', $redacted_json);
+
+        // Composed escaping — caught by the e2e leak sweep: the debugger's
+        // Request panel shows the POST params, where the R-escaped
+        // assignment is JSON-encoded AGAIN into the `text` param.
+        $request_text = 'text=' . json_encode(opencpu_inject_secrets('.formr$secret_k', $secrets));
+        $redacted_req = opencpu_redact_secrets($request_text, $secrets);
+        $this->assertStringNotContainsString('key<>123', $redacted_req);
+        $this->assertStringContainsString('[SECRET REDACTED]', $redacted_req);
+
+        // URL-encoded request bodies
+        $url_text = 'body: x=' . rawurlencode('it\'s&a"key<>123');
+        $this->assertStringNotContainsString(rawurlencode('key<>123'), opencpu_redact_secrets($url_text, $secrets));
+
+        // The exact form the debugger's Request panel shows: the injected
+        // R assignment ('-escaped) is then addslashes'd by
+        // OpenCPU_Request::__toString (so " -> \"). This is the leak the
+        // e2e sweep caught that the addcslashes-only variant missed.
+        $request_str = '...= ' . addslashes("'" . opencpu_inject_secrets('.formr$secret_k', $secrets));
+        $redacted_request = opencpu_redact_secrets($request_str, $secrets);
+        $this->assertStringNotContainsString('key<>123', $redacted_request);
+        $this->assertStringContainsString('[SECRET REDACTED]', $redacted_request);
     }
 
     // ---- RunSecret::isValidName ----
