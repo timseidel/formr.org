@@ -801,8 +801,9 @@ class Run extends Model
             return $this->custom_r_cache;
         }
         $this->custom_r_loaded = true;
+        $this->custom_r_cache = "";
         if ($this->custom_r_path != null) {
-            $this->custom_r_cache = $this->getFileContent($this->custom_r_path);
+            $this->custom_r_cache = (string) $this->getFileContent($this->custom_r_path);
         }
         return $this->custom_r_cache;
     }
@@ -817,6 +818,18 @@ class Run extends Model
             $this->secrets_cache = RunSecret::getSecretsForRun($this->id);
         }
         return $this->secrets_cache ?: array();
+    }
+
+    /**
+     * Secret names without decrypting any values. Use for display and
+     * export — only the R-injection path needs plaintext.
+     */
+    public function getSecretNames()
+    {
+        if ($this->secrets_loaded) {
+            return array_keys($this->secrets_cache ?: array());
+        }
+        return $this->id ? RunSecret::getSecretNamesForRun($this->id) : array();
     }
 
     public function getManifestJSON()
@@ -1259,7 +1272,7 @@ class Run extends Model
             'custom_js' => $this->getCustomJS(),
             'custom_css' => $this->getCustomCSS(),
             'custom_r' => $this->getCustomRFunctions(),
-            'secrets' => array_keys($this->getSecrets()),
+            'secrets' => $this->getSecretNames(),
             'expiresOn' => $this->expiresOn,
         );
 

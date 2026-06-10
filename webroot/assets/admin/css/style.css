@@ -350,9 +350,6 @@ body.skin-black .content-wrapper {
 .secret-value-wrap .secret-toggle:hover {
     color: #333;
 }
-.secret-masked {
-    -webkit-text-security: disc;
-}
 #secrets-table td {
     vertical-align: middle;
 }

@@ -164,9 +164,7 @@ class EmailQueue extends Queue {
             ['id' => $email_id, 'status_code' => $status_code]
         );
         
-        if ($result_log !== null && mb_strlen($result_log, '8bit') > 60000) {
-            $result_log = mb_strcut($result_log, 0, 60000);
-        }
+        $result_log = truncate_result_log($result_log);
 
         if($session_id) {
             $this->db->exec(

@@ -44,6 +44,11 @@ $settings['alternative_opencpu_instance'] = array(
 	'r_lib_path' => '/usr/local/lib/R/site-library'
 );
 
+// In-browser R fiddle (webR) that the OpenCPU debugger links to.
+// Code is passed in the URL fragment, which browsers never send to the
+// server. Set to '' to disable the links.
+$settings['r_fiddle_url'] = 'https://fiddle.rforms.org/';
+
 // email SMTP and queueing configuration for emails sent by the formr app itself
 // for example for email confirmation and password reset
 $settings['email'] = array(

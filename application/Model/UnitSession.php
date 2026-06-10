@@ -316,9 +316,7 @@ class UnitSession extends Model {
         // and "orphaned mid-flow". See "Hygiene 4" in EXPIRY_PLAN.md.
         // Track A: also set state='ENDED' (dual-write) and state_log
         // (structured sibling of the human-readable result_log).
-        if ($this->result_log !== null && mb_strlen($this->result_log, '8bit') > 60000) {
-            $this->result_log = mb_strcut($this->result_log, 0, 60000);
-        }
+        $this->result_log = truncate_result_log($this->result_log);
         $ended = $this->db->exec(
                 "UPDATE `survey_unit_sessions` SET
                 `ended` = NOW(),
@@ -368,9 +366,7 @@ class UnitSession extends Model {
      * See REFACTOR_QUEUE_PLAN.md A6 / D5.
      */
     public function logResult() {
-        if ($this->result_log !== null && mb_strlen($this->result_log, '8bit') > 60000) {
-            $this->result_log = mb_strcut($this->result_log, 0, 60000);
-        }
+        $this->result_log = truncate_result_log($this->result_log);
         $log = $this->db->exec(
                 "UPDATE `survey_unit_sessions` SET
                 `result` = :result,

@@ -2,6 +2,23 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Run-level custom R functions** (`custom_r`, settings → "R Functions" tab). Stored like `custom_css`/`custom_js`, injected after `library(formr)` into every OpenCPU evaluation and knit context (showif, value, feedback, `relative_to`, branch conditions, external URLs, email bodies, overview scripts) via a single `eval(parse(text = …))` statement, so syntax errors surface as clear runtime errors and Rmd chunks can't be broken by the injected code. Exposed through the v1 API (`custom_r` read/update) and run export/import.
+- **Run-level secrets** (settings → "R Secrets" tab). Encrypted at rest via Halite (`survey_run_secrets`), available in R as `.formr$secret_<name>`, and injected **only** when that literal reference appears in the unit's R code or the run's custom R functions. The admin UI is write-only: a stored value is never sent back to the browser — it can only be replaced or deleted. Names are restricted to `[A-Za-z0-9_]` server- and client-side. Run export carries secret *names* only; import recreates them as empty placeholders to be re-entered.
+- **Secret redaction** in OpenCPU debug output, error notifications, result logs, and `opencpu.log`. Secret values of 6+ characters are replaced with `[SECRET REDACTED]`. Best-effort by design: transformed occurrences (e.g. JSON-escaped non-ASCII) can evade a literal match, and the OpenCPU session itself still receives the plaintext — the deployment-level denypaths on `/console`/`/source` remain the wire-level guard.
+- **R syntax validation** for custom R code ("Save & Test R Syntax"): runs `base::parse()` on OpenCPU (parse only — nothing is executed) and reports errors inline, with a "Copy for LLM" export of code + error.
+- **"Open in R Fiddle" links in the OpenCPU debugger.** The R Markdown / R Code panels now link to an in-browser webR fiddle (default `https://fiddle.rforms.org/`, configurable/disableable via `$settings['r_fiddle_url']`). The (secret-redacted) code travels in the URL fragment, which browsers never transmit to the fiddle host.
+
+### Changes
+- `survey_unit_sessions.result_log` widened to MEDIUMTEXT; `truncate_result_log()` caps writes at the same 16 MiB limit (byte-safe for UTF-8) in the unit-session and email-queue paths.
+
+### Schema
+- `057_custom_r_path.sql` — `survey_runs.custom_r_path`.
+- `058_result_log_mediumtext.sql` — `result_log` TEXT → MEDIUMTEXT.
+- `059_create_run_secrets.sql` — `survey_run_secrets` (unique per run+name, FK cascade on run delete).
+
 ## [v1.0.0] - 16.05.2026
 
 ### Upgrade procedure — REQUIRED

@@ -1317,11 +1317,44 @@ function opencpu_inject_secrets($q, $secrets = null)
         if (strpos((string) $q, ".formr\$secret_{$name}") === false) {
             continue;
         }
-        $escaped = "'" . addcslashes((string) $value, "'\\") . "'";
+        // Escape quote/backslash AND newlines: a raw newline inside the
+        // single-quoted R string is valid R, but in knit contexts a value
+        // line starting with ``` would terminate the Rmd chunk early.
+        // addcslashes turns the newline char into the two-character \n
+        // sequence, which R's string parser converts back to a newline.
+        $escaped = "'" . addcslashes((string) $value, "'\\\n\r") . "'";
         $code .= ".formr\$secret_{$name} = {$escaped}\n";
     }
 
     return $code;
+}
+
+/**
+ * Build the R prelude injected into every evaluation/knit for the active
+ * run: the run's custom R functions followed by any referenced secrets.
+ *
+ * The custom R code is wrapped in eval(parse(text = <json string>)) rather
+ * than pasted raw: that keeps it a single statement (safe inside knitr
+ * settings chunks, where a raw line starting with ``` would terminate the
+ * chunk) and surfaces syntax errors as runtime errors with a clear message.
+ * Must run AFTER library(formr) so top-level custom code can call formr
+ * functions. Secrets are scanned for in both the caller's code and the
+ * custom R itself, so helpers like
+ * `call_api <- function() httr::GET(..., key = .formr$secret_api_key)`
+ * trigger injection without the unit code repeating the literal.
+ *
+ * @param string $q The R code or R Markdown source about to be evaluated.
+ * @return string R code to prepend (empty string if nothing to inject).
+ */
+function opencpu_run_prelude($q)
+{
+    $custom_r = opencpu_custom_r();
+    $prelude = '';
+    if ($custom_r) {
+        $prelude .= 'eval(parse(text = ' . json_encode($custom_r, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '))' . "\n";
+    }
+    $prelude .= opencpu_inject_secrets((string) $q . "\n" . (string) $custom_r);
+    return $prelude;
 }
 
 /**
@@ -1349,7 +1382,9 @@ function opencpu_redact_secrets($text, $known_secrets = null)
     $to_redact = [];
     foreach ($values as $v) {
         $v = (string) $v;
-        if ($v !== '') {
+        // Minimum length guards against redacting ubiquitous short strings
+        // (a secret of "1" would replace every digit 1 in the log).
+        if (mb_strlen($v) >= 6) {
             $to_redact[] = $v;
         }
     }
@@ -1359,6 +1394,23 @@ function opencpu_redact_secrets($text, $known_secrets = null)
     }
 
     return str_replace($to_redact, '[SECRET REDACTED]', $text);
+}
+
+/**
+ * Truncate a result_log so it fits survey_unit_sessions.result_log
+ * (MEDIUMTEXT, 16 MiB — see sql/patches/058_result_log_mediumtext.sql).
+ * mb_strcut is byte-safe: it never splits a UTF-8 sequence.
+ *
+ * @param string|null $log
+ * @return string|null
+ */
+function truncate_result_log($log)
+{
+    $max_bytes = 16777215; // MEDIUMTEXT
+    if ($log !== null && mb_strlen($log, '8bit') > $max_bytes) {
+        $log = mb_strcut($log, 0, $max_bytes);
+    }
+    return $log;
 }
 
 /**
@@ -1378,7 +1430,11 @@ function opencpu_validate_r_code(string $code): array {
         return ['valid' => true, 'message' => ''];
     }
     try {
-        $session = OpenCPU::getInstance()->post('/base/R/parse', ['text' => json_encode($code)]);
+        // OpenCPU parses urlencoded POST params as R code, so this JSON
+        // string is read by R's parser as a string literal. PHP's default
+        // \/ escape and \uXXXX surrogate pairs (for emoji etc.) are not
+        // valid R escapes — both flags are load-bearing.
+        $session = OpenCPU::getInstance()->post('/base/R/parse', ['text' => json_encode($code, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]);
         if ($session->hasError()) {
             $msg = $session->getError();
             $msg = preg_replace('/^R Error: /', '', $msg);
@@ -1410,17 +1466,12 @@ function opencpu_evaluate($code, $variables = null, $return_format = 'json', $co
 
     $r_variables = is_string($variables) ? $variables : opencpu_define_vars($variables, $context);
 
-    $custom_r = opencpu_custom_r();
-    if ($custom_r) {
-        $custom_r = 'eval(parse(text = ' . json_encode($custom_r) . '))' . "\n";
-    }
+    $r_prelude = opencpu_run_prelude($code);
 
-    $r_secrets = opencpu_inject_secrets($code);
-
-    $params = ['x' => '{ 
+    $params = ['x' => '{
 (function() {
-	' . $custom_r . '	library(formr)
-	' . $r_secrets . '	' . $r_variables . '
+	library(formr)
+	' . $r_prelude . '	' . $r_variables . '
 	' . $code . '
 })() }'];
 
@@ -1513,12 +1564,11 @@ function opencpu_knit_plaintext($source, $variables = null, $return_session = fa
         $show_warnings = 'TRUE';
     }
 
-    $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets($source);
+    $r_prelude = opencpu_run_prelude($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
+' . $r_prelude . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1626,8 +1676,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
         $source = $parts[2];
     }
 
-    $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets($source_with_yaml);
+    $r_prelude = opencpu_run_prelude($source_with_yaml);
 
     // include=FALSE on the settings chunk: the chunk's R code still runs
     // (library() / opts_chunk$set() / variable assignments), but the chunk
@@ -1642,7 +1691,7 @@ function opencpu_knit_iframe($source, $variables = null, $return_session = false
     $source = $yaml .
         '```{r settings,include=FALSE}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
+' . $r_prelude . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=' . $show_warnings . ',fig.height=7,fig.width=10)
 ' . $variables . '
 ```
@@ -1698,12 +1747,11 @@ function opencpu_knitdisplay($source, $variables = null, $return_session = false
         $show_warnings = 'TRUE';
     }
 
-    $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets($source);
+    $r_prelude = opencpu_run_prelude($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
+' . $r_prelude . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.height=7,fig.width=10)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1736,12 +1784,11 @@ function opencpu_knitadmin($source, $variables = null, $return_session = false)
         $show_warnings = 'TRUE';
     }
 
-    $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets($source);
+    $r_prelude = opencpu_run_prelude($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
+' . $r_prelude . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F)
 opts_knit$set(base.url="' . OpenCPU::TEMP_BASE_URL . '")
 ' . $variables . '
@@ -1773,12 +1820,11 @@ function opencpu_knit_email($source, array $variables = null, $return_format = '
         $show_warnings = 'TRUE';
     }
 
-    $custom_r = opencpu_custom_r();
-    $r_secrets = opencpu_inject_secrets($source);
+    $r_prelude = opencpu_run_prelude($source);
 
     $source = '```{r settings,warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F}
 library(knitr); library(formr)
-' . ($custom_r ? $custom_r . "\n" : '') . '' . $r_secrets . '
+' . $r_prelude . '
 opts_chunk$set(warning=' . $show_warnings . ',message=' . $show_warnings . ',error=' . $show_errors . ',echo=F,fig.retina=2)
 opts_knit$set(upload.fun=function(x) { paste0("cid:", URLencode(basename(x))) })
 ' . $variables . '
@@ -1840,12 +1886,12 @@ function opencpu_multistring_parse(UnitSession $unitSession, array $string_templ
 }
 
 /**
- * Redact known secret values from a given text. Replaces all occurrences
- * of secret values with the placeholder.
+ * Substitute parsed strings in the collection of items that were sent for parsing
+ * This function does not return anything as the collection of items is passed by reference
+ * For objects having the property 'label_parsed', they are checked and substituted
  *
- * @param string $text Text to redact secrets from
- * @param array|null $known_secrets Optional pre-loaded secrets array; if null loaded from run
- * @return string Text with secret values replaced
+ * @param array $array An array of data contaning label templates
+ * @param array $parsed_strings An array of parsed labels
  */
 function opencpu_substitute_parsed_strings(array &$array, array $parsed_strings)
 {
@@ -1886,6 +1932,43 @@ function opencpu_multiparse_values(UnitSession $unitSession, array $values, $ret
     return opencpu_evaluate($code, $variables, 'json', null, $return_session);
 }
 
+/**
+ * Build a link that opens R code in the in-browser R fiddle
+ * (https://fiddle.rforms.org, webR-based — runs entirely client-side).
+ *
+ * The code travels in the URL *fragment* (#code=<base64url>): browsers do
+ * not send fragments to the server, so the snippet never reaches the
+ * fiddle host or its logs, and fragments have no practical length budget.
+ * Callers must pass already-redacted code — the URL lands in the admin's
+ * browser history and clipboard.
+ *
+ * @param string $code The (redacted!) R or R Markdown source
+ * @param string $lang Editor mode: 'r' or 'rmd'
+ * @return string The fiddle URL
+ */
+function opencpu_fiddle_url($code, $lang = 'r')
+{
+    $base = rtrim((string) Config::get('r_fiddle_url', 'https://fiddle.rforms.org/'), '/');
+    if ($base === '') {
+        return '';
+    }
+    $b64url = rtrim(strtr(base64_encode((string) $code), '+/', '-_'), '=');
+    return $base . '/?lang=' . rawurlencode($lang) . '#code=' . $b64url;
+}
+
+/**
+ * Anchor tag for opencpu_fiddle_url(), or '' when the fiddle is disabled.
+ * $code must already be secret-redacted.
+ */
+function opencpu_fiddle_link($code, $lang = 'r')
+{
+    $url = opencpu_fiddle_url($code, $lang);
+    if ($url === '') {
+        return '';
+    }
+    return '&nbsp;|&nbsp;<a href="' . h($url) . '" target="_blank" rel="noopener">Open in R Fiddle <i class="fa fa-external-link"></i></a>';
+}
+
 function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
 {
     $debug = array();
@@ -1903,13 +1986,15 @@ function opencpu_debug($session, OpenCPU $ocpu = null, $rtype = 'json')
             $request = $session->getRequest();
             $params = $request->getParams();
             if (isset($params['text'])) {
+                $rmd_source = opencpu_redact_secrets(stripslashes(substr($params['text'], 1, -1)));
                 $debug['R Markdown'] = '
-					<a href="#" class="download_r_code" data-filename="formr_rmarkdown.Rmd">Download R Markdown file to debug.</a><br>
-					<textarea class="form-control" rows="10" readonly>' . h(opencpu_redact_secrets(stripslashes(substr($params['text'], 1, -1)))) . '</textarea>';
+					<a href="#" class="download_r_code" data-filename="formr_rmarkdown.Rmd">Download R Markdown file to debug.</a>' . opencpu_fiddle_link($rmd_source, 'rmd') . '<br>
+					<textarea class="form-control" rows="10" readonly>' . h($rmd_source) . '</textarea>';
             } elseif (isset($params['x'])) {
+                $r_source = opencpu_redact_secrets(substr($params['x'], 1, -1));
                 $debug['R Code'] = '
-					<a href="#" class="download_r_code" data-filename="formr_values_showifs.R">Download R code file to debug.</a><br>
-					<textarea class="form-control" rows="10" readonly>' . h(opencpu_redact_secrets(substr($params['x'], 1, -1))) . '</textarea>';
+					<a href="#" class="download_r_code" data-filename="formr_values_showifs.R">Download R code file to debug.</a>' . opencpu_fiddle_link($r_source, 'r') . '<br>
+					<textarea class="form-control" rows="10" readonly>' . h($r_source) . '</textarea>';
             }
             if ($session->hasError()) {
                 $debug['Response'] = pre_htmlescape(opencpu_redact_secrets($session->getError()));

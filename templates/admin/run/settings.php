@@ -256,6 +256,10 @@ my_score <- function(data) {
                                         Define sensitive values (API keys, tokens, passwords) here. They are <strong>stored encrypted</strong>
                                         in the database and <strong>automatically hidden</strong> from all logs, debug output, error messages,
                                         run exports, and API responses. Changes are saved immediately.
+                                        Secrets are <strong>write-only</strong>: once saved, the value is never shown again, here or
+                                        anywhere else &mdash; you can only replace or delete it. Names may contain letters, digits and
+                                        underscores, and secrets referenced in your R code remain hidden where possible &mdash;
+                                        but only if they are at least 6 characters long, so make them long and random.
                                     </p>
                                     <p>
                                         In your R code (showif, value, label, body, subject, condition, etc.), access a secret as
@@ -284,18 +288,19 @@ my_score <- function(data) {
                                                     </tr>
                                                 </thead>
                                                     <tbody id="secrets-tbody">
-                                                    <?php foreach ($run->getSecrets() as $name => $value): ?>
+                                                    <?php // Write-only: stored values are never rendered into the page. ?>
+                                                    <?php foreach ($run->getSecretNames() as $name): ?>
                                                     <tr>
                                                         <td><code>secret_<?= h($name) ?></code></td>
-                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="text" class="form-control input-sm secret-value secret-masked" value="<?= h($value) ?>"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Toggle visibility"><i class="fa fa-eye"></i></button></div></td>
+                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="password" class="form-control input-sm secret-value" value="" placeholder="(unchanged — type to replace)" autocomplete="new-password"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Show what you typed"><i class="fa fa-eye"></i></button></div></td>
                                                         <td><button type="button" class="btn btn-danger btn-xs delete-secret" data-toggle="tooltip" title="Delete secret"><i class="fa fa-trash"></i></button></td>
                                                     </tr>
                                                     <?php endforeach; ?>
                                                 </tbody>
                                                 <tfoot>
                                                     <tr>
-                                                        <td><input type="text" id="new-secret-name" class="form-control input-sm" placeholder="e.g. api_key"></td>
-                                                        <td><input type="text" id="new-secret-value" class="form-control input-sm" placeholder="Secret value"></td>
+                                                        <td><input type="text" id="new-secret-name" class="form-control input-sm" placeholder="e.g. api_key" pattern="[A-Za-z0-9_]+" title="Letters, digits and underscore only"></td>
+                                                        <td><div class="secret-value-wrap"><input type="password" id="new-secret-value" class="form-control input-sm" placeholder="Secret value" autocomplete="new-password"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Show what you typed"><i class="fa fa-eye"></i></button></div></td>
                                                         <td><button type="button" id="add-secret-btn" class="btn btn-primary btn-xs"><i class="fa fa-plus"></i></button></td>
                                                     </tr>
                                                 </tfoot>
