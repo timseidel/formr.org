@@ -1384,10 +1384,19 @@ function opencpu_redact_secrets($text, $known_secrets = null)
         $v = (string) $v;
         // Minimum length guards against redacting ubiquitous short strings
         // (a secret of "1" would replace every digit 1 in the log).
-        if (mb_strlen($v) >= 6) {
-            $to_redact[] = $v;
+        if (mb_strlen($v) < 6) {
+            continue;
         }
+        // Escaped variants too, not just the raw value: the source shown
+        // by opencpu_debug contains the R single-quoted form written by
+        // opencpu_inject_secrets (' -> \'), and error messages quoting
+        // request payloads contain the JSON-encoded form. A secret with a
+        // quote in it would otherwise sail through the literal match.
+        $to_redact[] = addcslashes($v, "'\\\n\r");
+        $to_redact[] = trim(json_encode($v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), '"');
+        $to_redact[] = $v;
     }
+    $to_redact = array_values(array_unique($to_redact));
 
     if (empty($to_redact)) {
         return $text;

@@ -73,6 +73,26 @@ class RunSecretsFunctionsTest extends TestCase
         $this->assertSame('[SECRET REDACTED] and [SECRET REDACTED]', $out);
     }
 
+    public function testEscapedFormsOfSecretsAreRedactedToo()
+    {
+        // Found in browser testing: the debugger shows the R source, where
+        // the secret appears in its R-escaped form ('it\'s…'), not raw —
+        // a literal match on the raw value sails right past it.
+        $secrets = ['k' => 'it\'s&a"key<>123'];
+
+        // exactly what opencpu_inject_secrets writes into the R source
+        $r_source = opencpu_inject_secrets('.formr$secret_k', $secrets);
+        $this->assertStringNotContainsString('[SECRET', $r_source, 'injection itself must carry the real value');
+        $redacted = opencpu_redact_secrets($r_source, $secrets);
+        $this->assertStringNotContainsString('key<>123', $redacted);
+        $this->assertStringContainsString('[SECRET REDACTED]', $redacted);
+
+        // JSON-encoded form, as in quoted request payloads in error output
+        $json_text = 'request was ' . json_encode(['x' => 'it\'s&a"key<>123']);
+        $redacted_json = opencpu_redact_secrets($json_text, $secrets);
+        $this->assertStringNotContainsString('key<>123', $redacted_json);
+    }
+
     // ---- RunSecret::isValidName ----
 
     public function testSecretNameValidation()
