@@ -59,8 +59,15 @@ import { ajaxErrorHandling, bootstrap_alert } from './main.js';
                 data: form.serialize(),
                 method: 'POST'
             }).done(function (data) {
-                if (data !== '')
-                    $(data).insertAfter($("#app_heading"));
+                if (data !== '') {
+                    // Show the response alert in the tab that was saved.
+                    // It used to be inserted after #app_heading, which lives
+                    // in the manifest tab — saving from any other tab gave
+                    // no visible feedback. Replace the previous alert so
+                    // repeated saves don't stack.
+                    form.prevAll('.run-settings-alerts').remove();
+                    $('<div class="run-settings-alerts"></div>').html(data).insertBefore(form);
+                }
                 $(elm).prop("disabled", true);
             }).fail(function (e, x, settings, exception) {
                 ajaxErrorHandling(e, x, settings, exception);

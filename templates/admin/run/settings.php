@@ -367,7 +367,7 @@ qplot(survey_name$created) # plot entries by startdate</code></pre></li>
                                                         <a href="<?php echo site_url('api/osf/login?redirect=admin/run/' . $run->name . '/settings'); ?>" class="btn btn-default"><i class="fa fa-link"></i> Connect to the &nbsp;<img src="<?= asset_url('build/img/osf-icon.png') ?>" alt="OSF Icon" /> <b>Open Science Framework</b></a>
                                                     </p>
                                                 <?php else: ?>
-                                                    <br /><br />
+                                                    <h4 class="lead"><i class="fa fa-link"></i> Open Science Framework</h4>
                                                     <div class="panel panel-default" id="panel1">
                                                         <div class="panel-heading">
                                                             <h4 class="panel-title">
