@@ -2,6 +2,11 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Optional `api_internal_url` setting** for R→formr API calls from OpenCPU. When set (e.g. `http://formr_app/api` on the shared Docker network), `opencpu_prepare_api_access` injects it as `.formr$host` instead of the public `api_base_url()`, so `formr_api_*()` calls skip DNS, TLS, and the reverse proxy (~30% faster per call in benchmarks). Empty (the default) keeps the previous behaviour. The internal hostname must resolve to a vhost that serves the API; the bearer token travels as plaintext HTTP on this URL, so only enable it on a trusted single-host Docker network.
+
 ## [v1.0.0] - 16.05.2026
 
 ### Upgrade procedure — REQUIRED
