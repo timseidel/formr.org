@@ -26,6 +26,8 @@
                                 <li><a href="#privacy" data-toggle="tab" aria-expanded="false">Privacy</a></li>
                                 <li><a href="#css" data-toggle="tab" aria-expanded="false">CSS</a></li>
                                 <li><a href="#js" data-toggle="tab" aria-expanded="false">JS</a></li>
+                                <li><a href="#r-functions" data-toggle="tab" aria-expanded="false">R Functions</a></li>
+                                <li><a href="#secrets" data-toggle="tab" aria-expanded="false">R Secrets</a></li>
                                 <li><a href="#manifest" data-toggle="tab" aria-expanded="false">App</a></li>
                                 <li><a href="#service_message" data-toggle="tab" aria-expanded="false">Service message</a></li>
                                 <li><a href="#reminder" data-toggle="tab" aria-expanded="false">Reminder</a></li>
@@ -115,7 +117,7 @@
                                                 <div class="form-group">
                                                     <label for="description">Description</label>
                                                     <p>Will be shown at the top of every page of the study. Optional.</p>
-                                                    <textarea data-editor="markdown" placeholder="Description" name="description" id="description" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->description); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Description" name="description" id="description" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->description); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -124,7 +126,7 @@
                                                 <div class="form-group">
                                                     <p>Your Imprint should contain information about who is responsible for the study, and how they can be contacted. It should also link to your privacy policy and in some cases to the settings page, where users can unsubscribe from emails and log out.</p>
                                                     <label title="Will be shown on every page of the run, good for contact info" for="footer_text">Imprint/Footer text</label>
-                                                    <textarea data-editor="markdown" placeholder="Footer text" name="footer_text" id="footer_text" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->footer_text); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Footer text" name="footer_text" id="footer_text" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->footer_text); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -133,7 +135,7 @@
                                                 <div class="form-group">
                                                     <label title="This will be the description of your study shown on the public page" for="public_blurb">Public blurb</label>
                                                     <p>This will be the description of your study shown on the <a href="<?php echo site_url("/public/studies"); ?>" target="_blank">public page</a>. Optional.</p>
-                                                    <textarea data-editor="markdown" placeholder="Blurb" name="public_blurb" id="public_blurb" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->public_blurb); ?></textarea>
+                                                    <textarea data-editor="markdown" placeholder="Blurb" name="public_blurb" id="public_blurb" rows="10" cols="80" class="big_ace_editor form-control"><?= h($run->public_blurb); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -193,7 +195,7 @@
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
-                                                    <textarea data-editor="css" placeholder="Enter your custom CSS here" name="custom_css" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomCSS()); ?></textarea>
+                                                    <textarea data-editor="css" placeholder="Enter your custom CSS here" name="custom_css" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomCSS()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -212,11 +214,99 @@
                                         <div class="row">
                                             <div class="col-md-12">
                                                 <div class="form-group">
-                                                    <textarea data-editor="javascript" placeholder="Enter your custom JS here" name="custom_js" rows="20" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomJS()); ?></textarea>
+                                                    <textarea data-editor="javascript" placeholder="Enter your custom JS here" name="custom_js" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomJS()); ?></textarea>
                                                 </div>
                                             </div>
                                         </div>
                                     </form>
+                                </div>
+                                <!-- /.tab-pane -->
+                                <div class="tab-pane" id="r-functions">
+                                    <form enctype="multipart/form-data" method="post" action="<?php echo admin_run_url($run->name, 'ajax_save_settings'); ?>" data-validate-url="<?= h(admin_run_url($run->name, 'ajax_validate_r_code')) ?>">
+                                        <p class="pull-right">
+                                            <button type="button" class="btn btn-primary btn-save-test-r-code">Save &amp; Test R Syntax</button>
+                                        </p>
+                                        <h4 class="lead"><i class="fa fa-cog"></i> R Functions</h4>
+                                        <p>
+                                            Define custom R functions and global variables here. They are injected before every R evaluation
+                                            in this run (showif, value, feedback, <code>relative_to</code>, branch conditions,
+                                            external URLs, email body, etc.) so you can call them by name. Use standard R syntax &mdash;
+                                            named functions, library calls, or global options.
+                                            To access run data (survey results, <code>survey_unit_sessions</code>, etc.), pass them
+                                            as arguments &mdash; functions cannot directly see variables defined in inline R code.
+                                        </p>
+                                        <div id="r-code-parse-result"></div>
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="form-group">
+                                                    <textarea data-editor="r" placeholder="# Custom R functions &mdash; callable by name in showif, value, feedback, etc.
+my_score <- function(data) {
+    mean(data, na.rm = TRUE)
+}" name="custom_r" rows="40" cols="80" class="big_ace_editor form-control"><?= h($run->getCustomRFunctions()); ?></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                <!-- /.tab-pane -->
+                                <div class="tab-pane" id="secrets">
+                                    <div id="secrets-alerts"></div>
+                                    <h4 class="lead"><i class="fa fa-lock"></i> Secrets</h4>
+                                    <p>
+                                        Define sensitive values (API keys, tokens, passwords) here. They are <strong>stored encrypted</strong>
+                                        in the database and <strong>automatically hidden</strong> from all logs, debug output, error messages,
+                                        run exports, and API responses. Changes are saved immediately.
+                                        Secrets are <strong>write-only</strong>: once saved, the value is never shown again, here or
+                                        anywhere else &mdash; you can only replace or delete it. Names may contain letters, digits and
+                                        underscores, and secrets referenced in your R code remain hidden where possible &mdash;
+                                        but only if they are at least 6 characters long, so make them long and random.
+                                    </p>
+                                    <p>
+                                        In your R code (showif, value, label, body, subject, condition, etc.), access a secret as
+                                        <code>.formr$secret_&lt;name&gt;</code> &mdash; for example, a secret named
+                                        <code>api_key</code> is available as <code>.formr$secret_api_key</code>.
+                                        Secrets are <strong>only sent to the R environment</strong> when your code literally contains
+                                        that <code>.formr$secret_&lt;name&gt;</code> reference — unused secrets stay in the database
+                                        and are never transmitted to OpenCPU. References constructed dynamically at runtime
+                                        (e.g. <code>get(paste0(".formr$secret_", var))</code>) won't trigger injection;
+                                        always use the literal <code>.formr$secret_&lt;name&gt;</code> form.
+                                    </p>
+                                    <p class="text-muted small">
+                                        <i class="fa fa-info-circle"></i> This is <strong>not</strong> where to put your formr v1 API secret.
+                                        The formr API uses OAuth2 access tokens generated automatically via
+                                        <code>formr_api_authenticate()</code> &mdash; no manual secret entry needed.
+                                    </p>
+                                    <div id="secrets-save-indicator" class="text-muted" style="visibility: hidden; height: 22px; margin-bottom: 10px;"><i class="fa fa-spinner fa-spin"></i> Saving...</div>
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <table class="table table-striped" id="secrets-table" data-save-url="<?= h(admin_run_url($run->name, 'ajax_save_settings')) ?>">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Value</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                    <tbody id="secrets-tbody">
+                                                    <?php // Write-only: stored values are never rendered into the page. ?>
+                                                    <?php foreach ($run->getSecretNames() as $name): ?>
+                                                    <tr>
+                                                        <td><code>secret_<?= h($name) ?></code></td>
+                                                        <td><input type="hidden" class="secret-name-hidden" value="<?= h($name) ?>"><div class="secret-value-wrap"><input type="password" class="form-control input-sm secret-value" value="" placeholder="(unchanged — type to replace)" autocomplete="new-password"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Show what you typed"><i class="fa fa-eye"></i></button></div></td>
+                                                        <td><button type="button" class="btn btn-danger btn-xs delete-secret" data-toggle="tooltip" title="Delete secret"><i class="fa fa-trash"></i></button></td>
+                                                    </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr>
+                                                        <td><input type="text" id="new-secret-name" class="form-control input-sm" placeholder="e.g. api_key" pattern="[A-Za-z0-9_]+" title="Letters, digits and underscore only"></td>
+                                                        <td><div class="secret-value-wrap"><input type="password" id="new-secret-value" class="form-control input-sm" placeholder="Secret value" autocomplete="new-password"><button type="button" class="secret-toggle" data-toggle="tooltip" title="Show what you typed"><i class="fa fa-eye"></i></button></div></td>
+                                                        <td><button type="button" id="add-secret-btn" class="btn btn-primary btn-xs"><i class="fa fa-plus"></i></button></td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
                                 <!-- /.tab-pane -->
                                 <div class="tab-pane" id="manifest">
