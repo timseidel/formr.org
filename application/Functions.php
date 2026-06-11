@@ -49,6 +49,30 @@ function alert($msg, $class = 'alert-warning', $dismissable = true)
     $site->alert($msg, $class, $dismissable);
 }
 
+/**
+ * Parse Markdown to HTML, falling back to the raw text when Parsedown throws.
+ *
+ * ParsedownExtra's block-HTML handling (processTagRoutine) feeds author
+ * markup through DOMDocument without null checks, so malformed HTML (e.g.
+ * a bare <head> tag) fatals with a PHP Error, not an Exception — still
+ * unfixed as of parsedown 1.8.0 / parsedown-extra 0.9.0. On failure the
+ * raw text is returned so the content survives, the error is logged, and
+ * the author is shown a warning naming $source so they can fix the markup.
+ */
+function parsedown_text_safe(Parsedown $parsedown, $text, $source = '')
+{
+    try {
+        return $parsedown->text($text);
+    } catch (\Throwable $e) {
+        formr_log_exception($e, 'PARSEDOWN.TEXT' . ($source !== '' ? " ($source)" : ''));
+        $where = $source !== '' ? ' in ' . htmlspecialchars($source) : '';
+        alert("The text{$where} could not be formatted because the Markdown parser "
+            . "cannot process its markup (this usually means malformed HTML, e.g. a stray "
+            . "or unclosed tag). It was saved as-is, without formatting.", 'alert-warning');
+        return $text;
+    }
+}
+
 function notify_user_error($error, $public_message = '')
 {
     $run_session = Site::getInstance()->getRunSession();
