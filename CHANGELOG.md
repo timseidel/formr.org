@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ### Added
 - **Optional `api_internal_url` setting** for R→formr API calls from OpenCPU. When set (e.g. `http://formr_app/api` on the shared Docker network), `opencpu_prepare_api_access` injects it as `.formr$host` instead of the public `api_base_url()`, so `formr_api_*()` calls skip DNS, TLS, and the reverse proxy (~30% faster per call in benchmarks). Empty (the default) keeps the previous behaviour. The internal hostname must resolve to a vhost that serves the API; the bearer token travels as plaintext HTTP on this URL, so only enable it on a trusted single-host Docker network.
 
+### Fixes
+- Run settings page: the special-unit links (service message, reminder, overview script) redirect back to the right settings tab again. `site_url()` appends a trailing slash to fragment-free URIs, so building the URL before converting `:::` to `#` produced `…settings#service_message/` — a fragment no tab matches. The `:::` → `#` conversion now happens before the URL is built (`createRunUnitAction` / `deleteRunUnitAction`).
+- `api_base_url()` no longer appends `/api` when a dedicated `api_domain` (different from `admin_domain`) is configured (#695). A dedicated API host serves the API at its root — its vhost rewrites `/` to `route=api/…` — so the docs page, the account-page R snippets, and the OpenCPU bridge previously pointed clients at a doubled `api/api/…` path. The `/api` suffix remains for the admin-domain fallback.
+- Run settings page: the "Settings saved" response alert now appears in the tab whose form was saved, replacing the previous alert instead of stacking. It used to be inserted after `#app_heading` — which lives in the manifest tab — so saving from any other tab gave no visible feedback.
+
+### Changes
+- Run settings page layout homogenized to match the newer admin credential page: consistent `row`/`col` grid, `h4.lead` section headings, equal-height markdown editors, empty-state hints for service messages/reminders/overview scripts, a clearer "Delete Reminder" button, and the Test Run link opens in a new tab. Removes the five duplicated `id="run_settings"` form ids (the save handlers are class-based).
+
 ## [v1.0.0] - 16.05.2026
 
 ### Upgrade procedure — REQUIRED

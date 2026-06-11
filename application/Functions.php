@@ -831,10 +831,15 @@ function site_url($uri = '', $params = array())
 function api_base_url()
 {
     $protocol = Config::get('protocol', 'https://');
-    $domain = Config::get('api_domain', '');
-    if (empty($domain)) {
-        $domain = Config::get('admin_domain', '');
+    $api_domain = strtolower(trim((string) Config::get('api_domain', '')));
+    $admin_domain = strtolower(trim((string) Config::get('admin_domain', '')));
+    if ($api_domain !== '' && $api_domain !== $admin_domain) {
+        // Dedicated API host: its vhost rewrites the root to route=api/...,
+        // so the API lives at the domain root — appending /api would point
+        // clients at api/api/... (#695).
+        return rtrim($protocol . $api_domain, '/');
     }
+    $domain = $api_domain !== '' ? $api_domain : $admin_domain;
     if (empty($domain)) {
         return rtrim(site_url('api'), '/');
     }
