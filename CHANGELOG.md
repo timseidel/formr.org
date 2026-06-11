@@ -2,6 +2,11 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+### Fixes (from v1.0.0 production error logs)
+- Monkey bar "next in run" no longer 500s (`Call to a member function end() on bool`, `RunHelper.php:83`) when the test session has no active unit session (e.g. the run session already ended or is dangling): `RunSession::getCurrentUnitSession()` returns `false`, not `null`, and `nextInRun()` only guarded against `null`. Now shows the "No unit session found" alert instead.
+- Spreadsheet import (`upload_items` / `add_survey`) no longer times out (`Maximum execution time of 360 seconds exceeded` in PhpSpreadsheet's `Cells::getHighestRowAndColumn`) on sheets whose used range is bloated by whitespace/empty-string cells. `SpreadsheetReader` called `$worksheet->getHighestDataColumn()` — a full scan of the sheet's cell index — once **per row** inside both the survey- and choices-sheet loops, making the read quadratic. The cell iterator's end column is now computed once, bounded to the rightmost allowlisted column. A synthetic 1500-row sheet with whitespace out to column 60 went from 161s to 9s; output is byte-identical.
+
 ## [v1.0.0] - 16.05.2026
 
 ### Upgrade procedure — REQUIRED
