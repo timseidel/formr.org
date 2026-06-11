@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ## [v1.1.1] - 11.06.2026
 
 ### Fixes
-- ParsedownExtra fatal error (`Call to a member function getAttribute() on null`) when a survey item label or run text field contains malformed HTML (e.g. a bare `<head>` tag). ParsedownExtra's DOMDocument block processor can return `null` from `getElementById()`, which then crashes as a PHP `Error` — not an `Exception` — so the existing `catch (Exception)` guard in `SurveyStudy::addItems` did not intercept it. All seven `parsedown->text()` call sites are now guarded with `catch (\Throwable $e)`; on failure, the raw (unparsed) text is stored and the error is logged via `formr_log_exception`. Affected sites: survey item labels, choice labels, run description/public_blurb/footer_text/privacy/tos, email body, pause body.
+- ParsedownExtra fatal error when a survey item label or run text field contains malformed HTML (e.g. a bare `<head>` tag). ParsedownExtra's DOMDocument block processor (`processTagRoutine`) dereferences DOM nodes without null checks, crashing with a PHP `Error` (`TypeError: DOMNode::replaceChild(): Argument #1 ($node) must be of type DOMNode, null given`, surfacing on some setups as `Call to a member function getAttribute() on null`) — not an `Exception` — so the existing `catch (Exception)` guard in `SurveyStudy::addItems` did not intercept it. All Parsedown `text()` call sites now go through a new `parsedown_text_safe()` helper (`Functions.php`) that catches `\Throwable`, stores the raw (unparsed) text, logs via `formr_log_exception`, and shows the study author a warning naming the affected field. Covered sites: survey item labels, choice labels, run description/public_blurb/footer_text/privacy/tos, email body, pause text, and page body (the chained call in `Page::create()` was previously unguarded). Regression-tested in `tests/ParsedownTextSafeTest.php`.
+
+### Changes
+- Updated `erusev/parsedown` 1.7.4 → 1.8.0 and `erusev/parsedown-extra` 0.8.1 → 0.9.0 (the February 2026 maintenance releases). Verified that the upgrade alone does **not** fix the DOMDocument crash above — 0.9.0 ships the same unguarded `processTagRoutine` — hence the call-site guard.
 
 ## [v1.1.0] - 11.06.2026
 
