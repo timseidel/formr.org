@@ -2,6 +2,11 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v1.1.1] - 11.06.2026
+
+### Fixes
+- ParsedownExtra fatal error (`Call to a member function getAttribute() on null`) when a survey item label or run text field contains malformed HTML (e.g. a bare `<head>` tag). ParsedownExtra's DOMDocument block processor can return `null` from `getElementById()`, which then crashes as a PHP `Error` — not an `Exception` — so the existing `catch (Exception)` guard in `SurveyStudy::addItems` did not intercept it. All seven `parsedown->text()` call sites are now guarded with `catch (\Throwable $e)`; on failure, the raw (unparsed) text is stored and the error is logged via `formr_log_exception`. Affected sites: survey item labels, choice labels, run description/public_blurb/footer_text/privacy/tos, email body, pause body.
+
 ## [v1.1.0] - 11.06.2026
 
 ### Added
