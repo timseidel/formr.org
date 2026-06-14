@@ -595,6 +595,24 @@ class Run extends Model
         return null;
     }
 
+    /**
+     * Resolve a (computed) target position to a real, existing run
+     * position. Positions are sparse integers, so a numeric value from
+     * an R expression (SkipTo unit) may not map to a unit. Returns the
+     * target itself if a unit sits there, otherwise the next existing
+     * position after it, or null if none exists at/after the target.
+     */
+    public function resolvePositionAtOrAfter($target)
+    {
+        $target = (int) $target;
+        $rowId = $this->db->findValue('survey_run_units', ['run_id' => $this->id, 'position' => $target], 'id');
+        if (!empty($rowId)) {
+            return $target;
+        }
+
+        return $this->getNextPosition($target - 1);
+    }
+
     public function getParsedPrivacyField($field)
     {
         return match ($field) {

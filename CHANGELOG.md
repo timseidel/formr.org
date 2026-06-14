@@ -2,6 +2,11 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`SkipTo` unit** — a computed jump. Like `SkipForward`/`SkipBackward` it evaluates an R expression, but instead of coercing the result to a boolean and jumping to a fixed `if_true` position, it interprets the returned number as an **absolute run position** and sends the participant there — one unit replaces a stack of conditional skips (e.g. `if (group == 1) 30 else 50`). Reuses the `survey_branches` table (R code in `condition`; no schema change). If the returned position has no unit (positions are sparse), it snaps forward to the next existing position via `Run::resolvePositionAtOrAfter()`; a non-numeric/out-of-range result logs a warning, notifies the study admin, and continues to the next unit so participants are never stranded. **Caveat:** the position numbers are literal R values — unlike `SkipForward.if_true` they are *not* rebased on import-with-offset or unit renumbering.
+
 ## [v1.1.1] - 11.06.2026
 
 ### Fixes
