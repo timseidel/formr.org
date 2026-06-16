@@ -1,20 +1,17 @@
 <?php echo $prepend ?>
 
 <div class="padding-below">
-    <label>Go to the position returned by this R code: <br>
+    <label>Skip to the position returned by this R code: <br>
         <textarea style="width:388px;" data-editor="r" class="form-control col-md-5" name="condition" rows="4" placeholder="Return a position number, e.g.: if (survey1$group == 1) 30 else 50"><?= $condition ?></textarea>
     </label><br />
 
     <p class="help-block" style="max-width:388px;">
-        The R code must return a single number: the run position to jump to
-        (the numbers shown next to each unit). If no unit sits at that exact
-        position, the participant is sent to the next existing position after
-        it. If the code returns a non-numeric value, the participant simply
-        continues to the next unit.
-        <br><br>
-        <strong>Note:</strong> these position numbers are literal — they are
-        not automatically rebased when the run is imported with an offset or
-        when units are renumbered. Reference stable positions.
+        Return a single number — the position to jump to (shown next to each
+        unit). No unit at that position? The next one after it is used. A
+        non-numeric result just continues to the next unit.
+        <br>
+        <small class="text-muted">Positions are literal: they are not rebased
+        when the run is imported with an offset or units are renumbered.</small>
     </p>
 </div>
 <div class="clear clearfix"></div>

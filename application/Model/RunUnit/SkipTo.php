@@ -16,7 +16,7 @@
 class SkipTo extends Branch {
 
     public $type = 'SkipTo';
-    public $icon = 'fa-share';
+    public $icon = 'fa-arrows-alt';
 
     /**
      * An array of unit's exportable attributes. No `if_true` /
@@ -37,6 +37,17 @@ class SkipTo extends Branch {
 
     public function getUnitSessionExpirationData(UnitSession $unitSession) {
         $data = ['expire_relatively' => null, 'check_failed' => false];
+
+        if (trim((string) $this->condition) === '') {
+            // A blank SkipTo has no destination. It's a routing-only unit
+            // with no participant UI, so don't send empty code to OpenCPU
+            // and strand the participant in a wait state — just continue.
+            $data['log'] = $this->getLogMessage('skipto_invalid', 'SkipTo unit: no R code given. Continuing to next unit.');
+            $data['end_session'] = $data['move_on'] = true;
+            $this->outputData = $data;
+            return $data;
+        }
+
         $opencpu_vars = $unitSession->getRunData($this->condition);
         $eval = opencpu_evaluate($this->condition, $opencpu_vars);
 

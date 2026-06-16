@@ -31,6 +31,7 @@ transition straight to ENDED).
 | **Shuffle** | PENDING → directly to **ENDED** (synchronous) | **ENDED** | Picks a branch and returns `end_session+move_on` in one execute(). |
 | **SkipForward** (Branch) | PENDING → directly to **ENDED** | **ENDED** | Evaluates OpenCPU condition. True → `end_session+run_to=<target>`; False → `end_session+move_on`. Can cause SUPERSEDED on the `run_to` target's prior row (diagnostic only). |
 | **SkipBackward** (Branch) | PENDING → directly to **ENDED** | **ENDED** | Same shape as SkipForward; back-jump nature means it's the **primary legitimate source** of duplicate-`unit_id` rows in a run-session. The `iteration` column distinguishes loop passes. |
+| **SkipTo** (Branch) | PENDING → directly to **ENDED** | **ENDED** | Evaluates OpenCPU expression to a **numeric position** (not a boolean). Valid → `end_session+run_to=<resolved>`, where the target is resolved via `Run::resolvePositionAtOrAfter()` (snaps forward to the next existing position if the exact one is empty); non-numeric / past-end → `end_session+move_on` (never strands the participant). Like SkipBackward it can target an earlier position, so it can legitimately produce duplicate-`unit_id` rows; the `iteration` column distinguishes passes. |
 
 ## SUPERSEDED is a diagnostic, not a transition you design around
 

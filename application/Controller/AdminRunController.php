@@ -775,7 +775,7 @@ class AdminRunController extends AdminController
             ),
             'SkipTo' => array(
                 'title' => 'Add a computed jump (Skip To position)',
-                'icon' => 'fa-share',
+                'icon' => 'fa-arrows-alt',
             ),
             'Wait' => array(
                 'title' => 'Add Waiting Time',
