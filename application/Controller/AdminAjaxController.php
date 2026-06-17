@@ -81,6 +81,84 @@ class AdminAjaxController {
         return $this->response->setContent($content);
     }
 
+    /**
+     * Create the "Randomiser" replacement for the deprecated Shuffle unit.
+     *
+     * Instead of a bespoke RunUnit + `shuffle` table, this mints a premade
+     * one-item survey whose single hidden `calculate` item runs
+     * `sample(1:N, 1)`. A survey with only hidden items auto-finalises and
+     * moves on (Survey::processStudy -> studyCompleted), so the participant
+     * never sees a page — same fire-and-forget UX as Shuffle. The assignment
+     * lands in the survey's own results table and is referenced downstream as
+     * `<surveyname>$group` (e.g. in showifs / SkipTo conditions).
+     */
+    private function ajaxCreateRandomiser() {
+        if (!Request::isAjaxRequest()) {
+            formr_error(406, 'Not Acceptable');
+        }
+
+        $run = $this->controller->run;
+        $user = Site::getCurrentUser();
+
+        $groups = (int) $this->request->getParam('groups');
+        if ($groups < 2) {
+            $groups = 2;
+        }
+        if ($groups > 100) {
+            $groups = 100;
+        }
+        $position = (int) $this->request->getParam('position');
+
+        // Generate a survey name that does not yet exist for this user.
+        // SurveyStudy::createFromData reuses an existing survey of the same
+        // name (sharing its results_table), which we must avoid here.
+        $name = 'randomiser';
+        $suffix = 1;
+        while (SurveyStudy::loadByUserAndName($user, $name)->valid) {
+            $suffix++;
+            $name = 'randomiser_' . $suffix;
+        }
+
+        $surveyData = (object) [
+            'name' => $name,
+            'items' => [
+                (object) [
+                    'type' => 'calculate',
+                    'name' => 'group',
+                    'label' => '',
+                    'value' => "sample(1:{$groups}, 1)",
+                ],
+            ],
+        ];
+
+        // createFromData both mints the survey AND attaches it to the run
+        // as a Survey unit: its create path runs RunUnit::create() with
+        // $options['run'] set, and RunUnit has a public $run property, so
+        // assignProperties() repoints $this->run at the real run and
+        // addToRun() inserts the survey_run_units row at $position. Do NOT
+        // attach a second time here — that produces a duplicate unit that
+        // only surfaces on reload.
+        SurveyStudy::createFromData($surveyData, ['run' => $run, 'position' => $position ?: 10]);
+
+        $study = SurveyStudy::loadByUserAndName($user, $name);
+        $runUnitId = $study->valid
+            ? (int) $this->dbh->findValue('survey_run_units', ['run_id' => $run->id, 'unit_id' => $study->id], ['id'])
+            : 0;
+
+        $unit = $runUnitId ? RunUnit::findByRunUnitId($runUnitId, ['run_unit_id' => $runUnitId]) : null;
+
+        if ($unit && $unit->valid) {
+            alert('<strong>Success.</strong> Randomiser survey created. Read the assigned group later as <code>' . h($name) . '$group</code>.', 'alert-success');
+            $content = $unit->displayForRun($this->site->renderAlerts());
+        } else {
+            $this->response->setStatusCode(500, 'Bad Request');
+            alert('<strong>Sorry.</strong> The randomiser survey could not be created.', 'alert-danger');
+            $content = $this->site->renderAlerts();
+        }
+
+        return $this->response->setContent($content);
+    }
+
     private function ajaxGetUnit() {
         if (!Request::isAjaxRequest()) {
             formr_error(406, 'Not Acceptable');

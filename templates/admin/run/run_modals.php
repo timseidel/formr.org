@@ -138,6 +138,33 @@
         </div>
     </div>
 </script>
+<script id="tpl-randomiser-modal" type="text/formr">
+    <div class="modal fade" tabindex="-1" role="dialog" aria-labelledby="AddRandomiser" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                    <h3>Add Randomiser</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="randomiser_groups">Randomly assign each participant to how many groups?</label>
+                        <input type="number" min="2" max="100" step="1" value="2" id="randomiser_groups" name="randomiser_groups" class="form-control" style="max-width: 140px;" />
+                        <p class="help-block">
+                            Creates a small survey with a <code>calculate</code> item
+                            (<code>sample(1:N, 1)</code>). Read the assigned group later as
+                            <code>surveyname$group</code>.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success btn-create-randomiser" aria-hidden="true" type="button">Create</button>
+                    <button class="btn cancel" data-dismiss="modal" aria-hidden="true" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>
 <script id="tpl-remind-run-session" type="text/formr">
     <div class="modal fade" tabindex="-1" role="dialog" aria-labelledby="DeleteUser" aria-hidden="true">
         <div class="modal-dialog">

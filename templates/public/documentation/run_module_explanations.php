@@ -437,11 +437,25 @@
         <div class="panel-heading">
             <a class="accordion-toggle" data-toggle="collapse" href="#shuffle">
                 <i class="fa-fw fa fa-random pull-left fa-3x"></i>
-                Shuffle<br>
+                Shuffle <small>(deprecated)</small><br>
                 <small>randomise participants</small></a>
         </div>
         <div id="shuffle" class="panel-collapse collapse shuffle">
             <div class="panel-body">
+                <div class="alert alert-warning">
+                    <strong>Shuffle is deprecated.</strong> Existing runs keep
+                    working, but for new randomisation use the
+                    <em>Randomiser</em> button in the run editor. It inserts a
+                    small survey containing a <code>calculate</code> item that
+                    runs <code>sample(1:N, 1)</code> once per participant. The
+                    group lands in that survey's own results table and is read
+                    later as <code>surveyname$group</code> (e.g.
+                    <code>randomiser$group == 1</code>) instead of
+                    <code>shuffle$group</code> &mdash; so the assignment is
+                    exported alongside your other survey data, and you can place
+                    several independent randomisers without the
+                    <code>tail(shuffle$group, 1)</code> workaround.
+                </div>
                 <p>
                     This is a very simple component. You simply choose how many groups you want to randomly assign your participants to. We start counting at one (1), so if you have two groups you will check <code>shuffle$group == 1</code> and <code>shuffle$group == 2</code>. You can read a person's group using <code>shuffle$group</code>. If you generate random groups at more than one point in a run, you might have to use the last one <code>tail(shuffle$group,1)</code> or check the unit id <code>shuffle$unit_id</code>, but usually you needn't do this.
                 </p>

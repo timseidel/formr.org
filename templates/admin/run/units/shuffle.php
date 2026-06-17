@@ -1,7 +1,16 @@
 <?php echo $prepend ?>
 
-<h5> 
-    Randomly assign to one of 
+<div class="alert alert-warning">
+    <strong>Shuffle is deprecated.</strong> This unit still works, but new
+    randomisation should use the <em>Randomiser</em> button, which inserts a
+    small survey with a <code>calculate</code> item
+    (<code>sample(1:N, 1)</code>). Its assignment is stored with your survey
+    data and read as <code>surveyname$group</code> rather than
+    <code>shuffle$group</code>.
+</div>
+
+<h5>
+    Randomly assign to one of
     <input style="width:100px" class="form-control" type="number" placeholder="2" name="groups" value="<?= h($groups) ?>"> 
     groups counting from one.
 </h5>

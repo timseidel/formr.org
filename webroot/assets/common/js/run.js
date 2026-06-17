@@ -584,6 +584,37 @@ import {
       return false;
     });
 
+    // Randomiser (replaces the deprecated Shuffle unit): ask how many
+    // groups in a Bootstrap modal, then create a premade survey via
+    // ajax_create_randomiser.
+    this.form.find("a.add_randomiser").click(function (e) {
+      e.preventDefault();
+      var href = $(this).attr("href");
+      var $modal = $($.parseHTML(getHTMLTemplate("tpl-randomiser-modal", {})));
+      $modal
+        .on("shown.bs.modal", function () {
+          var $input = $modal.find("#randomiser_groups");
+          $input.focus().select();
+          $modal.find(".btn-create-randomiser").click(function () {
+            var n = parseInt($input.val(), 10);
+            if (isNaN(n) || n < 2) {
+              $input.closest(".form-group").addClass("has-error");
+              $input.focus();
+              return;
+            }
+            $modal.modal("hide");
+            run.addUnit(
+              href + (href.indexOf("?") === -1 ? "?" : "&") + "groups=" + n
+            );
+          });
+        })
+        .on("hidden.bs.modal", function () {
+          $modal.remove();
+        })
+        .modal("show");
+      return false;
+    });
+
     this.form.find("a.public-toggle").click(this.publicToggle);
 
     this.exporter_button = this.form.find("a.export_run_units");

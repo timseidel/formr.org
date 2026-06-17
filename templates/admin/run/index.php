@@ -70,8 +70,10 @@
                             <div id="run-unit-choices">
                                 <div class="form-group col-lg-12 text-center">
                                     <div class="btn-group">
-                                        <?php foreach ($add_unit_buttons as $name => $button): ?>
-                                            <a class="add_<?= strtolower($name)?> add_run_unit btn btn-default btn-lg hastooltip" title="<?= $button['title'] ?>" href="<?= admin_run_url($run->name, 'ajax_create_run_unit?type=' . $name) ?>" >
+                                        <?php foreach ($add_unit_buttons as $name => $button):
+                                            $jsClass = $button['js_class'] ?? 'add_run_unit';
+                                            $action = $button['action'] ?? ('ajax_create_run_unit?type=' . $name); ?>
+                                            <a class="add_<?= strtolower($name)?> <?= $jsClass ?> btn btn-default btn-lg hastooltip" title="<?= $button['title'] ?>" href="<?= admin_run_url($run->name, $action) ?>" >
                                                 <i class="fa fa-2x <?= $button['icon'] ?>"></i>
                                             </a>
                                         <?php endforeach; ?>

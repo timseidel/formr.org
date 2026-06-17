@@ -2,6 +2,14 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Randomiser** button in the run editor. Replaces the deprecated *Shuffle* unit by inserting a premade one-item survey whose single hidden `calculate` item runs `sample(1:N, 1)` (you are prompted for *N*). A survey with only hidden items auto-finalises and moves on, so the participant never sees a page — same fire-and-forget behaviour as Shuffle. The assignment is stored in the survey's own results table and read downstream as `surveyname$group` (e.g. `randomiser$group == 1`), so it exports alongside other survey data and supports several independent randomisers without the `tail(shuffle$group, 1)` workaround. Built on the existing `SurveyStudy::createFromData` survey-from-items path (`AdminAjaxController::ajaxCreateRandomiser`).
+
+### Changes
+- **Shuffle unit deprecated.** It is no longer offered for new runs (removed from the run-editor add menu). Existing Shuffle units keep working unchanged — the `Shuffle` class, the `shuffle` / `survey_shuffles` tables, the `shuffle$group` R data frame, and the API/admin exports are all retained. The Shuffle edit dialog and run-module docs now carry a deprecation notice pointing to the Randomiser.
+
 ## [v1.1.1] - 11.06.2026
 
 ### Fixes

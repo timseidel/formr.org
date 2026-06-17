@@ -777,9 +777,16 @@ class AdminRunController extends AdminController
                 'title' => 'Add Waiting Time',
                 'icon' => 'fa-hourglass-half',
             ),
-            'Shuffle' => array(
-                'title' => 'Add shuffle (Randomise Participants)',
+            // Shuffle is deprecated and no longer offered for new runs.
+            // Its replacement is the Randomiser below, which inserts a
+            // premade one-item survey (a `calculate` item doing
+            // `sample(1:N, 1)`). Existing Shuffle units keep working; see
+            // RunUnit::SupportedUnits and Model/RunUnit/Shuffle.php.
+            'Randomiser' => array(
+                'title' => 'Add Randomiser (assign to groups)',
                 'icon' => 'fa-random',
+                'js_class' => 'add_randomiser',
+                'action' => 'ajax_create_randomiser',
             ),
             'Page' => array(
                 'title' => 'Add a Stop Point',
