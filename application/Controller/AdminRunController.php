@@ -764,6 +764,7 @@ class AdminRunController extends AdminController
             'SkipBackward' => array(
                 'title' => 'Add a loop (Skip Backwards)',
                 'icon' => 'fa-backward',
+                'group' => 'jump',
             ),
             'Pause' => array(
                 'title' => 'Add a Pause',
@@ -772,10 +773,12 @@ class AdminRunController extends AdminController
             'SkipForward' => array(
                 'title' => 'Add a jump (Skip Forward)',
                 'icon' => 'fa-forward',
+                'group' => 'jump',
             ),
             'SkipTo' => array(
                 'title' => 'Add a computed jump (Skip To position)',
                 'icon' => 'fa-arrows-alt',
+                'group' => 'jump',
             ),
             'Wait' => array(
                 'title' => 'Add Waiting Time',
