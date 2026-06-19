@@ -6,10 +6,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ### Added
 - **External key-value storage** for asynchronous data from external tools (scoring engines, CRMs, webhooks). A new `/api/v1/runs/{name}/external_data` endpoint lets an authorized OAuth client push state-independent JSON into a run with no active participant session and without touching the live run flow. Data is namespaced by a `source` and keyed by an author-chosen `ref` (e.g. a `calculate` item value) — the `ref` is a routing key, not a credential: access is gated by the per-client run allowlist (`oauth_client_runs`) and dedicated `external_data:read` / `external_data:write` scopes (kept separate from `data:*`, which grants access to participant survey responses). Partial updates are merged atomically at the DB level via `JSON_MERGE_PATCH` (RFC 7386 — a `null` value deletes that key), so concurrent external writers can't clobber each other. Survey logic reads the data back via the API (`external_data:read`), filtered by source/ref. New `ExternalData` model and `ExternalDataResource`; the participant `session` login code is never used as the reference and never leaves formr.
+- **Run ingestion keys** for external tools that can't perform the OAuth2 flow (webhook senders, lab instruments, SMS gateways). A static, per-run, **write-only** key (managed in run settings → "Ingest keys") authorises `POST /api/ingest/<run>/<key>` — the key may also be sent as an `X-Api-Key` or `Authorization: Bearer` header. Each key is pinned to one `source` namespace and one run; only its SHA-256 hash is stored (shown once at creation), and it is revocable with a `last_used_at` audit trail. Writes go through the same atomic `JSON_MERGE_PATCH` path as the OAuth endpoint. New `RunIngestKey` model + `ApiController::ingestAction()`. (No built-in per-key rate limit — enforce at the reverse proxy.)
 
 ### Schema
 - `sql/patches/060_create_external_data.sql` — new `survey_external_data` table (`payload` LONGTEXT, `CHECK (JSON_VALID(...))`, unique on `(run_id, source_name, external_ref)`, FK to `survey_runs` ON DELETE CASCADE).
 - `sql/patches/061_add_external_data_scopes.sql` — seeds the `external_data:read` / `external_data:write` OAuth scopes (idempotent).
+- `sql/patches/062_create_run_ingest_keys.sql` — new `survey_run_ingest_keys` table (SHA-256 `key_hash`, `key_prefix`, pinned `source_name`, `last_used_at`, `revoked`, FK to `survey_runs` ON DELETE CASCADE).
 
 ## [v1.1.1] - 11.06.2026
 

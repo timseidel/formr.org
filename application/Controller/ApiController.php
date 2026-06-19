@@ -129,6 +129,130 @@ class ApiController extends Controller
         $this->respond($data['statusCode'], $data['statusText'], $data['response']);
     }
 
+    /**
+     * Non-OAuth ingestion endpoint for external key-value data.
+     *
+     *   POST /api/ingest/<run>/<key>        (key in the URL — webhook style)
+     *   POST /api/ingest/<run>              + X-Api-Key: <key>  header
+     *                                       (or Authorization: Bearer <key>)
+     *   body: { "ref": "...", "data": { ... } }
+     *
+     * Authenticated by a run ingestion key (RunIngestKey), NOT OAuth — so
+     * it lives outside dispatchV1/doAction and verifies the key itself.
+     * The key is pinned to one run + one `source` and is write-only, so
+     * the body carries only ref + data. Writes go through the same
+     * ExternalData::mergePayload() as the OAuth endpoint (atomic
+     * JSON_MERGE_PATCH; null deletes a key).
+     *
+     * NOTE: per-key rate limiting is intentionally NOT done here — the
+     * app Cache is per-request (non-persistent), so a meaningful limiter
+     * needs the reverse proxy (e.g. traefik rate-limit middleware on
+     * /api/ingest) or a DB-backed counter. Enforce it at the proxy.
+     */
+    public function ingestAction($run = null, $key = null)
+    {
+        if (!Request::isHTTPPostRequest()) {
+            return $this->respond(Response::STATUS_METHOD_NOT_ALLOWED, 'Method Not Allowed', array(
+                'code' => Response::STATUS_METHOD_NOT_ALLOWED,
+                'message' => 'Use POST to send ingestion data.',
+            ));
+        }
+
+        $key = $this->extractIngestKey($key);
+        if ($key === null) {
+            return $this->ingestError(Response::STATUS_UNAUTHORIZED, 'An ingestion key is required (in the URL, X-Api-Key, or Authorization: Bearer header).');
+        }
+
+        $row = RunIngestKey::resolve($key);
+        if (!$row) {
+            // Unknown or revoked — don't distinguish.
+            return $this->ingestError(Response::STATUS_UNAUTHORIZED, 'Invalid or revoked ingestion key.');
+        }
+
+        // The key is the authority for which run is written; the <run> in
+        // the path is for readability and must match, or we 404 to avoid
+        // silently writing a different run than the URL implies.
+        $runModel = new Run($run);
+        if (!$runModel->valid || (int) $runModel->id !== (int) $row['run_id']) {
+            return $this->ingestError(Response::STATUS_NOT_FOUND, 'Run not found for this ingestion key.');
+        }
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            return $this->ingestError(Response::STATUS_BAD_REQUEST, 'Request body must be a JSON object.');
+        }
+        $ref = isset($body['ref']) ? $body['ref'] : null;
+        $data = isset($body['data']) ? $body['data'] : null;
+        if ($err = ExternalData::validateRefAndData($ref, $data)) {
+            return $this->ingestError(Response::STATUS_BAD_REQUEST, $err);
+        }
+
+        // source is pinned to the key — body cannot override it.
+        $merged = ExternalData::mergePayload((int) $row['run_id'], $row['source_name'], trim($ref), $data);
+        if ($merged === null && $data !== array()) {
+            return $this->ingestError(Response::STATUS_INTERNAL_SERVER_ERROR, 'Failed to store ingestion data.');
+        }
+        RunIngestKey::touchLastUsed($row['id']);
+
+        return $this->respond(Response::STATUS_OK, 'OK', array(
+            'source' => $row['source_name'],
+            'ref' => trim($ref),
+            'payload' => $merged,
+        ));
+    }
+
+    /** Pull the ingestion key from the path, X-Api-Key, or Bearer header. */
+    private function extractIngestKey($pathKey)
+    {
+        if (is_string($pathKey) && $pathKey !== '') {
+            return $pathKey;
+        }
+        $headers = $this->requestHeaders();
+        if (!empty($headers['x-api-key'])) {
+            return $headers['x-api-key'];
+        }
+        $auth = $headers['authorization'] ?? '';
+        if ($auth && preg_match('/^Bearer\s+(.+)$/i', trim($auth), $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    /**
+     * Case-insensitive request headers. Apache strips `Authorization`
+     * from $_SERVER on many configs, so fall back to
+     * apache_request_headers() — the same path bshaffer's OAuth2\Request
+     * uses to find the bearer token.
+     */
+    private function requestHeaders()
+    {
+        $out = array();
+        if (function_exists('apache_request_headers')) {
+            foreach ((array) apache_request_headers() as $k => $v) {
+                $out[strtolower($k)] = $v;
+            }
+        }
+        if (empty($out['authorization'])) {
+            if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+                $out['authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
+            } elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+                $out['authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            }
+        }
+        if (empty($out['x-api-key']) && !empty($_SERVER['HTTP_X_API_KEY'])) {
+            $out['x-api-key'] = $_SERVER['HTTP_X_API_KEY'];
+        }
+        return $out;
+    }
+
+    private function ingestError($code, $message)
+    {
+        return $this->respond($code, ApiBase::getStatusText($code), array(
+            'code' => $code,
+            'message' => $message,
+        ));
+    }
+
     public function oauthAction($action = null)
     {
         if (!$this->isValidAction('oauth', $action)) {

@@ -31,6 +31,12 @@ You only ever need the credentials the researcher gives you and the
 `ref` values they pass you. You cannot reach any run you weren't
 granted.
 
+> **Can't do OAuth?** If your platform can only POST to a fixed URL
+> (most webhook senders — Zapier, Qualtrics, Google Forms, SMS
+> gateways, lab instruments), skip sections 1–2 and use an **ingestion
+> key** instead — see *"No-OAuth option"* at the end. Everything else
+> (the merge semantics, field rules, errors) is identical.
+
 ---
 
 ## 1. Get credentials
@@ -186,5 +192,57 @@ Error bodies carry a human-readable `message`.
 
 You never handle participant logins or sessions; you only ever deal with
 your credentials and the `ref` values the study hands you.
+
+---
+
+## No-OAuth option: ingestion keys (capability URLs)
+
+If your platform can't do the OAuth token exchange — it can only POST to
+a single static URL, maybe with one static header — the researcher can
+issue you an **ingestion key** instead. It's a single static secret, no
+token step.
+
+**What the researcher does:** in the run's settings → **Ingest keys**,
+they create a key pinned to one `source` (e.g. `scoring_engine`). The
+full key (`fri_…`) is shown **once** at creation; they copy it to you.
+They can revoke it any time.
+
+**What the key can do:** **write only**, to that **one source** of that
+**one run**. It can't read anything and can't reach another study — so a
+leaked key has a small blast radius. (Reading still requires OAuth.)
+
+**Send it one of two ways:**
+
+Key in the URL (simplest — works with any webhook sender):
+```bash
+curl -s -X POST https://<formr-host>/api/ingest/my_study/fri_YOUR_KEY \
+  -H "Content-Type: application/json" \
+  -d '{"ref":"participant-abc123","data":{"score_a":1,"score_b":2}}'
+```
+
+Or key in a header (preferred if you can set one — keeps it out of URLs/logs):
+```bash
+curl -s -X POST https://<formr-host>/api/ingest/my_study \
+  -H "X-Api-Key: fri_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"ref":"participant-abc123","data":{"score_a":1,"score_b":2}}'
+```
+(`Authorization: Bearer fri_YOUR_KEY` works too.)
+
+**Body is just `{ref, data}`** — no `source`, because the key is already
+pinned to one. Everything else is identical to the OAuth endpoint: the
+same partial-merge semantics (omitted keys survive, `null` deletes), the
+same `ref`/`data` rules, idempotent retries. Response echoes the merged
+payload.
+
+**Errors:** `400` bad body; `401` missing/unknown/revoked key; `404` the
+key is valid but the `<run>` in the URL isn't the key's run; `405`
+non-POST.
+
+**Operational notes:** treat the key as a secret. If it rides in the URL
+it can land in server/proxy logs — prefer the header form, and rotate by
+creating a new key and revoking the old. There's no built-in per-key
+rate limit yet; put one on `/api/ingest` at your reverse proxy if you
+need it.
 
 [rfc]: https://datatracker.ietf.org/doc/html/rfc7386

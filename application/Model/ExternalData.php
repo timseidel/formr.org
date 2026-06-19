@@ -45,6 +45,26 @@ class ExternalData extends Model
     }
 
     /**
+     * Validate the ref + data of a write, shared by the OAuth resource
+     * (ExternalDataResource) and the non-OAuth ingest endpoint
+     * (ApiController::ingestAction) so both enforce identical rules.
+     *
+     * @return string|null Error message, or null if valid.
+     */
+    public static function validateRefAndData($ref, $data)
+    {
+        if (!is_string($ref) || trim($ref) === '' || strlen($ref) > 191) {
+            return "A non-empty 'ref' (max 191 chars) is required.";
+        }
+        // data must be a JSON object, not a scalar or list — the payload
+        // is a key->value document and JSON_MERGE_PATCH expects an object.
+        if (!is_array($data) || (count($data) > 0 && array_keys($data) === range(0, count($data) - 1))) {
+            return "'data' must be a JSON object of key/value pairs.";
+        }
+        return null;
+    }
+
+    /**
      * Atomic create-or-merge of a partial JSON document for one
      * (run, source, ref) cell.
      *

@@ -80,13 +80,8 @@ class ExternalDataResource extends BaseResource
         if (!ExternalData::isValidSource((string) $source)) {
             return $this->error(400, "A valid 'source' (1-50 chars, letters/digits/._-) is required.");
         }
-        if (!is_string($ref) || trim($ref) === '' || strlen($ref) > 191) {
-            return $this->error(400, "A non-empty 'ref' (max 191 chars) is required.");
-        }
-        // data must be a JSON object, not a scalar or list — the payload
-        // is a key->value document and JSON_MERGE_PATCH expects an object.
-        if (!is_array($data) || (count($data) > 0 && array_keys($data) === range(0, count($data) - 1))) {
-            return $this->error(400, "'data' must be a JSON object of key/value pairs.");
+        if ($err = ExternalData::validateRefAndData($ref, $data)) {
+            return $this->error(400, $err);
         }
 
         $merged = ExternalData::mergePayload($this->run->id, $source, trim($ref), $data);
