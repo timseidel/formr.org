@@ -166,4 +166,63 @@ class ExternalData extends Model
 
         return $out;
     }
+
+    /**
+     * Flattened export: one row per (source, ref), top-level payload
+     * keys spread into their own columns. Nested objects and arrays are
+     * JSON-encoded as strings so tabular formats (CSV/XLSX) stay flat.
+     *
+     * Collects all distinct top-level payload keys across every row for
+     * the run so column order is consistent (source, ref, …keys…, updated_at).
+     *
+     * @param int         $run_id
+     * @param string|null $source_name  Filter to one namespace.
+     * @return array{columns: string[], rows: array[]}
+     */
+    public static function getForRunFlattened($run_id, $source_name = null)
+    {
+        $rows = self::getForRun($run_id, $source_name);
+
+        if (empty($rows)) {
+            return array('columns' => array('source', 'ref', 'updated_at'), 'rows' => array());
+        }
+
+        $allKeys = array();
+        foreach ($rows as $row) {
+            if (is_array($row['payload'])) {
+                foreach ($row['payload'] as $k => $v) {
+                    $allKeys[$k] = true;
+                }
+            }
+        }
+        $payloadKeys = array_keys($allKeys);
+        sort($payloadKeys, SORT_NATURAL | SORT_FLAG_CASE);
+
+        // Sanitize payload keys for use as column headers in tabular exports:
+        // replace non-alphanumeric chars with underscore, prefix with _ if numeric.
+        $safeColumns = array();
+        foreach ($payloadKeys as $key) {
+            $safe = preg_replace('/[^A-Za-z0-9_]/', '_', $key);
+            if (ctype_digit($safe[0] ?? '')) {
+                $safe = '_' . $safe;
+            }
+            $safeColumns[$key] = $safe;
+        }
+
+        $columns = array_merge(array('source', 'ref'), array_values($safeColumns), array('updated_at'));
+
+        $flat = array();
+        foreach ($rows as $row) {
+            $out = array('source' => $row['source'], 'ref' => $row['ref']);
+            foreach ($payloadKeys as $key) {
+                $val = isset($row['payload'][$key]) ? $row['payload'][$key] : null;
+                $colName = $safeColumns[$key];
+                $out[$colName] = is_array($val) ? json_encode($val, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) : $val;
+            }
+            $out['updated_at'] = $row['updated_at'];
+            $flat[] = $out;
+        }
+
+        return array('columns' => $columns, 'rows' => $flat);
+    }
 }

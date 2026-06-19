@@ -394,6 +394,84 @@ class AdminRunController extends AdminController
         }
     }
 
+    private function exportExternalDataAction()
+    {
+        $run = $this->run;
+        $format = $this->request->str('format');
+        $source = $this->request->str('source');
+        SpreadsheetReader::verifyExportFormat($format);
+
+        $result = ExternalData::getForRunFlattened($run->id, $source ?: null);
+        if (empty($result['rows'])) {
+            alert('No external data to export.', 'alert-info');
+            $this->request->redirect(admin_run_url($run->name, 'settings') . '#ingest-keys');
+        }
+
+        $SPR = new SpreadsheetReader();
+        $filename = $run->name . '_external_data';
+
+        if ($format === 'json') {
+            $SPR->exportJSON($result['rows'], $filename);
+            return;
+        }
+
+        // For tabular formats we need a PDOStatement-like approach.
+        // Build a temp table from the flattened rows so exportCSV/XLSX can stream.
+        $columns = $result['columns'];
+        $rows = $result['rows'];
+
+        $db = DB::getInstance();
+        $tmpTable = '_tmp_export_ext_' . $run->id . '_' . mt_rand(10000, 99999);
+
+        $colDefs = array();
+        foreach ($columns as $col) {
+            $colDefs[] = '`' . $col . '` TEXT';
+        }
+        $db->exec('CREATE TEMPORARY TABLE `' . $tmpTable . '` (' . implode(', ', $colDefs) . ')');
+
+        if (!empty($rows)) {
+            $placeholders = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
+            $sql = 'INSERT INTO `' . $tmpTable . '` (`' . implode('`, `', $columns) . '`) VALUES ' . $placeholders;
+            $stmt = $db->prepare($sql);
+            foreach ($rows as $row) {
+                $values = array();
+                foreach ($columns as $col) {
+                    $values[] = isset($row[$col]) ? $row[$col] : null;
+                }
+                $stmt->execute($values);
+            }
+        }
+
+        $resultsStmt = $db->prepare('SELECT * FROM `' . $tmpTable . '`');
+        $resultsStmt->execute();
+
+        $downloaded = false;
+        switch ($format) {
+            case 'xlsx':
+                $downloaded = $SPR->exportXLSX($resultsStmt, $filename);
+                break;
+            case 'xls':
+                $downloaded = $SPR->exportXLS($resultsStmt, $filename);
+                break;
+            case 'csv_german':
+                $downloaded = $SPR->exportCSV_german($resultsStmt, $filename);
+                break;
+            case 'tsv':
+                $downloaded = $SPR->exportTSV($resultsStmt, $filename);
+                break;
+            default:
+                $downloaded = $SPR->exportCSV($resultsStmt, $filename);
+                break;
+        }
+
+        $db->exec('DROP TEMPORARY TABLE IF EXISTS `' . $tmpTable . '`');
+
+        if (!$downloaded) {
+            alert('An error occurred during external data export.', 'alert-danger');
+            $this->request->redirect(admin_run_url($run->name, 'settings') . '#ingest-keys');
+        }
+    }
+
     private function exportSurveyResultsAction()
     {
         $studies = $this->run->getAllSurveys();
