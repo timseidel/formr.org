@@ -748,6 +748,75 @@ class AdminAjaxController {
 
     // --- End PWA Icon Actions ---
 
+    // +++++ INGESTION KEY ACTIONS +++++
+
+    private function ajaxCreateIngestKey() {
+        if (!Request::isAjaxRequest() || !$this->request->isHTTPPostRequest()) {
+            formr_error(406, 'Not Acceptable');
+        }
+        $run = $this->controller->run;
+        if (!$run || !$run->valid) {
+            $this->response->setContentType('application/json');
+            return $this->response->setJsonContent(['success' => false, 'message' => 'No valid run.']);
+        }
+
+        $label = trim($this->request->str('label'));
+        $source = trim($this->request->str('ingest_source'));
+
+        if (!ExternalData::isValidSource($source)) {
+            $this->response->setContentType('application/json');
+            return $this->response->setJsonContent([
+                'success' => false,
+                'message' => 'Source must be 1–50 characters: letters, digits, dot, dash, or underscore.',
+            ]);
+        }
+
+        $result = RunIngestKey::generate($run->id, $label, $source);
+        if (!$result) {
+            $this->response->setContentType('application/json');
+            return $this->response->setJsonContent([
+                'success' => false,
+                'message' => 'Could not create the ingestion key.',
+            ]);
+        }
+
+        $this->response->setContentType('application/json');
+        return $this->response->setJsonContent([
+            'success' => true,
+            'data' => [
+                'id' => $result['id'],
+                'key' => $result['key'],
+                'prefix' => $result['prefix'],
+                'label' => $label ?: 'Untitled key',
+                'source_name' => $source,
+                'created' => date('Y-m-d H:i'),
+            ],
+        ]);
+    }
+
+    private function ajaxRevokeIngestKey() {
+        if (!Request::isAjaxRequest() || !$this->request->isHTTPPostRequest()) {
+            formr_error(406, 'Not Acceptable');
+        }
+        $run = $this->controller->run;
+        if (!$run || !$run->valid) {
+            $this->response->setContentType('application/json');
+            return $this->response->setJsonContent(['success' => false, 'message' => 'No valid run.']);
+        }
+
+        $id = (int) $this->request->getParam('id');
+        if (!$id) {
+            $this->response->setContentType('application/json');
+            return $this->response->setJsonContent(['success' => false, 'message' => 'Missing key id.']);
+        }
+
+        $ok = RunIngestKey::revoke($id, $run->id);
+        $this->response->setContentType('application/json');
+        return $this->response->setJsonContent($ok
+            ? ['success' => true]
+            : ['success' => false, 'message' => 'Could not revoke that key.']);
+    }
+
     protected function getPrivateAction($name) {
         $parts = array_filter(explode('_', $name));
         $action = array_shift($parts);

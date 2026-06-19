@@ -421,6 +421,158 @@ import { ajaxErrorHandling, bootstrap_alert } from './main.js';
             }
         }
 
+        // --- Ingestion keys management (mirrors API credentials UX) ---
+        {
+            const ingestPanel = document.getElementById('ingest-keys-panel');
+            if (ingestPanel) {
+                const createUrl = ingestPanel.dataset.createUrl;
+                const revokeUrl = ingestPanel.dataset.revokeUrl;
+                const apiBaseUrl = ingestPanel.dataset.apiBaseUrl;
+                const runName = ingestPanel.dataset.runName;
+                const labelInput = document.getElementById('ingest-label-input');
+                const sourceInput = document.getElementById('ingest-source-input');
+                const createBtn = document.getElementById('ingest-create-btn');
+                const listWrap = document.getElementById('ingest-keys-list-wrap');
+                const onceBox = document.getElementById('ingest-key-once');
+
+                const SOURCE_PATTERN = /^[A-Za-z0-9_.\-]{1,50}$/;
+
+                function escAttr(s) {
+                    return String(s)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                }
+
+                function showOnceBox(key, sourceName) {
+                    ingestPanel.querySelector('.ingest-out-key').textContent = key;
+                    var curlCmd = 'curl -X POST ' + escAttr(apiBaseUrl) + '/ingest/' + escAttr(runName) + '/<key> \\\n' +
+                        '  -H "Content-Type: application/json" \\\n' +
+                        '  -H "X-Api-Key: <key>" \\\n' +
+                        '  -d \'{"ref": "participant_42", "data": {"score": 7.3}}\'';
+                    ingestPanel.querySelector('.ingest-out-curl').textContent = curlCmd;
+                    onceBox.classList.remove('hidden');
+                    jQuery(onceBox).find('.copy-on-click').each(function () {
+                        jQuery(this).off('click.copy').on('click.copy', function () {
+                            try {
+                                var text = jQuery(this).text();
+                                navigator.clipboard.writeText(text);
+                                jQuery(this).tooltip({title: 'Copied!', position: 'top'}).tooltip('show');
+                                var self = this;
+                                setTimeout(function () { jQuery(self).tooltip('destroy'); }, 1500);
+                            } catch (e) {}
+                        });
+                    });
+                }
+
+                function ensureTable() {
+                    var table = listWrap.querySelector('.ingest-keys-list');
+                    if (table) return table;
+                    listWrap.querySelector('.ingest-keys-empty').remove();
+                    table = document.createElement('table');
+                    table.className = 'table table-striped ingest-keys-list';
+                    table.innerHTML = '<thead><tr><th>Label</th><th>Source</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody></tbody>';
+                    listWrap.appendChild(table);
+                    return table;
+                }
+
+                function addRow(data) {
+                    var table = ensureTable();
+                    var tbody = table.querySelector('tbody');
+                    var tr = document.createElement('tr');
+                    tr.dataset.id = data.id;
+                    tr.innerHTML =
+                        '<td class="ingest-key-label">' + escAttr(data.label) + '</td>' +
+                        '<td><code class="ingest-key-source">' + escAttr(data.source_name) + '</code></td>' +
+                        '<td class="ingest-key-created">' + escAttr(data.created) + '</td>' +
+                        '<td class="ingest-key-last-used"><span class="text-muted">never</span></td>' +
+                        '<td><button type="button" class="btn btn-danger btn-xs revoke-ingest-key"><i class="fa fa-trash"></i> Revoke</button></td>';
+                    tbody.prepend(tr);
+                    return tr;
+                }
+
+                createBtn.addEventListener('click', function () {
+                    var label = (labelInput.value || '').trim();
+                    var source = (sourceInput.value || '').trim();
+
+                    if (!source) {
+                        alert('Please enter a source namespace (1–50 chars: letters, digits, dot, dash, underscore).');
+                        return;
+                    }
+                    if (!SOURCE_PATTERN.test(source)) {
+                        alert('Source must be 1–50 characters: letters, digits, dot, dash, or underscore.');
+                        return;
+                    }
+
+                    createBtn.disabled = true;
+                    var fd = new FormData();
+                    fd.append('label', label);
+                    fd.append('ingest_source', source);
+
+                    fetch(createUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                        .then(function (r) { return r.json(); })
+                        .then(function (json) {
+                            createBtn.disabled = false;
+                            if (!json || !json.success) {
+                                alert((json && json.message) || 'Could not create ingestion key.');
+                                return;
+                            }
+                            showOnceBox(json.data.key, json.data.source_name);
+                            addRow(json.data);
+                            labelInput.value = '';
+                            sourceInput.value = '';
+                            labelInput.focus();
+                        })
+                        .catch(function () {
+                            createBtn.disabled = false;
+                            alert('Request failed.');
+                        });
+                });
+
+                sourceInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); createBtn.click(); }
+                });
+                labelInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); createBtn.click(); }
+                });
+
+                ingestPanel.addEventListener('click', function (e) {
+                    var revokeBtn = e.target.closest('.revoke-ingest-key');
+                    if (!revokeBtn) return;
+                    var row = revokeBtn.closest('tr');
+                    if (!row) return;
+                    var id = row.dataset.id;
+                    if (!confirm('Revoke this ingestion key? Tools using it will stop working immediately. The key will be removed from this list.')) return;
+
+                    revokeBtn.disabled = true;
+                    var fd = new FormData();
+                    fd.append('id', id);
+
+                    fetch(revokeUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                        .then(function (r) { return r.json(); })
+                        .then(function (json) {
+                            if (json && json.success) {
+                                var tbody = row.parentNode;
+                                row.remove();
+                                if (tbody && tbody.children.length === 0) {
+                                    var tbl = tbody.closest('table');
+                                    if (tbl) tbl.remove();
+                                    var emptyP = document.createElement('p');
+                                    emptyP.className = 'text-muted ingest-keys-empty';
+                                    emptyP.innerHTML = '<em>You have no ingestion keys yet. Create one below.</em>';
+                                    listWrap.appendChild(emptyP);
+                                }
+                            } else {
+                                revokeBtn.disabled = false;
+                                alert((json && json.message) || 'Could not revoke that key.');
+                            }
+                        })
+                        .catch(function () { revokeBtn.disabled = false; alert('Request failed.'); });
+                });
+            }
+        }
+
         // --- Save & test R Syntax (extracted from settings.php inline JS) ---
         {
             const rForm = document.querySelector('#r-functions form');

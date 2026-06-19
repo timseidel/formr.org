@@ -28,6 +28,7 @@
                                 <li><a href="#js" data-toggle="tab" aria-expanded="false">JS</a></li>
                                 <li><a href="#r-functions" data-toggle="tab" aria-expanded="false">R Functions</a></li>
                                 <li><a href="#secrets" data-toggle="tab" aria-expanded="false">R Secrets</a></li>
+                                <li><a href="#ingest-keys" data-toggle="tab" aria-expanded="false">Ingest keys</a></li>
                                 <li><a href="#manifest" data-toggle="tab" aria-expanded="false">App</a></li>
                                 <li><a href="#service_message" data-toggle="tab" aria-expanded="false">Service message</a></li>
                                 <li><a href="#reminder" data-toggle="tab" aria-expanded="false">Reminder</a></li>
@@ -306,6 +307,111 @@ my_score <- function(data) {
                                                 </tfoot>
                                             </table>
                                         </div>
+                                    </div>
+                                </div>
+                                <!-- /.tab-pane -->
+                                <div class="tab-pane" id="ingest-keys">
+                                    <h4 class="lead"><i class="fa fa-key"></i> Ingestion keys</h4>
+                                    <p>
+                                        Static, <strong>write-only</strong> keys that let external tools which <strong>cannot do the OAuth2 flow</strong>
+                                        (webhooks, scoring engines, CRMs, SMS gateways) push external key-value data into this run.
+                                        Each key is pinned to one <strong>source</strong> namespace. The tool sends data either by embedding the key in the URL
+                                        (<code>POST <?= h(api_base_url()) ?>/ingest/<?= h($run->name) ?>/&lt;key&gt;</code>)
+                                        or via an <code>X-Api-Key</code> / <code>Authorization: Bearer</code> header, with body <code>{"ref": "...", "data": { ... }}</code>.
+                                    </p>
+                                    <p class="text-muted small">
+                                        <i class="fa fa-info-circle"></i> Only the key's hash is stored &mdash; the full key is shown <strong>once</strong>, at creation.
+                                        A key can only <strong>write</strong> its one source on this run; it can never read data or reach another study. Reads stay on the OAuth API.
+                                        Treat keys as secrets and rotate by creating a new one and revoking the old. If a key may travel in a URL, prefer the header form.
+                                    </p>
+
+                                    <div id="ingest-keys-panel"
+                                         data-create-url="<?= h(admin_run_url($run->name, 'ajax_create_ingest_key')) ?>"
+                                         data-revoke-url="<?= h(admin_run_url($run->name, 'ajax_revoke_ingest_key')) ?>"
+                                         data-api-base-url="<?= h(api_base_url()) ?>"
+                                         data-run-name="<?= h($run->name) ?>">
+
+                                        <div id="ingest-keys-list-wrap">
+                                        <?php if (empty($ingest_keys)): ?>
+                                            <p class="text-muted ingest-keys-empty"><em>You have no ingestion keys yet. Create one below.</em></p>
+                                        <?php else: ?>
+                                            <table class="table table-striped ingest-keys-list">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Label</th>
+                                                        <th>Source</th>
+                                                        <th>Created</th>
+                                                        <th>Last used</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                <?php foreach (($ingest_keys ?? array()) as $k): ?>
+                                                    <?php if ($k['revoked']) { continue; } ?>
+                                                    <tr data-id="<?= (int) $k['id'] ?>">
+                                                        <td class="ingest-key-label"><?= h($k['label']) ?></td>
+                                                        <td><code class="ingest-key-source"><?= h($k['source_name']) ?></code></td>
+                                                        <td class="ingest-key-created"><?= h($k['created']) ?></td>
+                                                        <td class="ingest-key-last-used"><?= $k['last_used_at'] ? h($k['last_used_at']) : '<span class="text-muted">never</span>' ?></td>
+                                                        <td>
+                                                            <button type="button" class="btn btn-danger btn-xs revoke-ingest-key"><i class="fa fa-trash"></i> Revoke</button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                        <?php endif; ?>
+                                        </div>
+
+                                        <div id="ingest-key-once" class="hidden" style="margin-top: 20px;">
+                                            <div class="alert alert-success" id="ingest-key-success">
+                                                <strong>Ingestion key created.</strong>
+                                            </div>
+                                            <div class="alert alert-warning">
+                                                <strong>One-time display.</strong> Copy the key now &mdash; we only store a hash, so it cannot be recovered later.
+                                            </div>
+                                            <table class="table table-bordered">
+                                                <tr>
+                                                    <td>Key</td>
+                                                    <td><code class="copy-on-click ingest-out-key"></code></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>cURL example</td>
+                                                    <td><pre><code class="copy-on-click ingest-out-curl"></code></pre></td>
+                                                </tr>
+                                            </table>
+                                        </div>
+
+                                        <h4 class="lead" style="margin-top: 30px;">Create a new ingestion key</h4>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label class="control-label" for="ingest-label-input">Label</label>
+                                                    <input id="ingest-label-input" type="text" maxlength="100" class="form-control input-sm" placeholder="e.g. Qualtrics webhook">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label class="control-label" for="ingest-source-input">Source</label>
+                                                    <input id="ingest-source-input" type="text" class="form-control input-sm" placeholder="e.g. scoring_engine" pattern="[A-Za-z0-9_.\-]{1,50}" title="1-50 chars: letters, digits, dot, dash, underscore">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label class="control-label">&nbsp;</label>
+                                                    <button type="button" class="btn btn-primary btn-raised btn-block" id="ingest-create-btn">
+                                                        <i class="fa fa-plus"></i> Create key
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p class="help-block">The label is for your reference only. The source namespace limits which external data stream this key can write to. The key will start with <code>fri_</code> and is shown exactly once.</p>
+
+                                        <noscript>
+                                            <div class="alert alert-info" style="margin-top: 15px;">
+                                                JavaScript is required to manage ingestion keys.
+                                            </div>
+                                        </noscript>
                                     </div>
                                 </div>
                                 <!-- /.tab-pane -->

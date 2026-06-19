@@ -316,6 +316,7 @@ class AdminRunController extends AdminController
             'reminders' => $this->run->getSpecialUnits(true, 'ReminderEmail'),
             'service_messages' => $this->run->getSpecialUnits(true, 'ServiceMessagePage'),
             'overview_scripts' => $this->run->getSpecialUnits(true, 'OverviewScriptPage'),
+            'ingest_keys' => RunIngestKey::listForRun($this->run->id),
         ));
 
         return $this->sendResponse();
