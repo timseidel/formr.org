@@ -74,12 +74,20 @@ class ExternalDataResource extends BaseResource
         $body = $this->getJsonBody();
 
         $source = isset($body['source']) ? $body['source'] : null;
-        $ref = isset($body['ref']) ? $body['ref'] : null;
-        $data = isset($body['data']) ? $body['data'] : null;
 
         if (!ExternalData::isValidSource((string) $source)) {
             return $this->error(400, "A valid 'source' (1-50 chars, letters/digits/._-) is required.");
         }
+
+        // Batch mode: top-level "entries" array with per-entry ref+data.
+        if (isset($body['entries']) && is_array($body['entries'])) {
+            return $this->writeBatch($source, $body['entries']);
+        }
+
+        // Single-ref mode (original).
+        $ref = isset($body['ref']) ? $body['ref'] : null;
+        $data = isset($body['data']) ? $body['data'] : null;
+
         if ($err = ExternalData::validateRefAndData($ref, $data)) {
             return $this->error(400, $err);
         }
@@ -93,6 +101,33 @@ class ExternalDataResource extends BaseResource
             'source' => $source,
             'ref' => trim($ref),
             'payload' => $merged,
+        ));
+    }
+
+    private function writeBatch($source, array $entries)
+    {
+        if ($err = ExternalData::validateBatch($entries)) {
+            return $this->error(400, $err);
+        }
+
+        // Validate all entries first — reject the entire batch on any problem.
+        foreach ($entries as $i => $entry) {
+            $ref = trim($entry['ref']);
+            $data = $entry['data'];
+            if ($err = ExternalData::validateRefAndData($ref, $data)) {
+                return $this->error(400, "entries[{$i}]: {$err}");
+            }
+        }
+
+        try {
+            $results = ExternalData::mergePayloadBatch($this->run->id, $source, $entries);
+        } catch (\Exception $e) {
+            return $this->error(500, 'Failed to store batch: ' . $e->getMessage());
+        }
+
+        return $this->response(200, 'External data stored', array(
+            'source' => $source,
+            'entries' => $results,
         ));
     }
 }

@@ -87,6 +87,8 @@ Authorization: Bearer <access_token>
 
 ## 3. Push data
 
+### Single ref
+
 ```
 POST  /api/v1/runs/{run_name}/external_data
 PATCH /api/v1/runs/{run_name}/external_data   (identical behaviour)
@@ -114,6 +116,50 @@ Response (`200`) echoes the **full stored payload** after your write:
 ```json
 { "source": "scoring_engine", "ref": "participant-abc123", "payload": { "score_a": 1, "score_b": 2 } }
 ```
+
+### Batch (multiple refs in one request)
+
+If you need to write data for several participants in one call, send an
+`entries` array instead of a top-level `ref`/`data` pair. All entries
+share the same `source`; each has its own `ref` and `data`:
+
+```json
+{
+  "source": "scoring_engine",
+  "entries": [
+    { "ref": "participant-abc123", "data": { "score_a": 1, "score_b": 2 } },
+    { "ref": "participant-def456", "data": { "score_a": 3, "score_b": 4 } }
+  ]
+}
+```
+
+```bash
+curl -s -X POST https://<formr-host>/api/v1/runs/my_study/external_data \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"scoring_engine","entries":[{"ref":"participant-abc123","data":{"score_a":1,"score_b":2}},{"ref":"participant-def456","data":{"score_a":3,"score_b":4}}]}'
+```
+
+Response (`200`) returns per-entry results in the same order:
+
+```json
+{
+  "source": "scoring_engine",
+  "entries": [
+    { "ref": "participant-abc123", "payload": { "score_a": 1, "score_b": 2 } },
+    { "ref": "participant-def456", "payload": { "score_a": 3, "score_b": 4 } }
+  ]
+}
+```
+
+**Batch rules:**
+
+- **All-or-nothing.** If *any* entry fails validation, the entire request
+  is rejected with a `400` and nothing is written. The error message
+  includes the entry index (e.g. `entries[2]: A non-empty 'ref' ...`).
+- **Max 100 entries** per batch request.
+- Each entry follows the same merge semantics as a single-ref write.
+- `source` is shared across all entries (one request = one source).
 
 ### Merge semantics (important)
 
@@ -234,6 +280,29 @@ pinned to one. Everything else is identical to the OAuth endpoint: the
 same partial-merge semantics (omitted keys survive, `null` deletes), the
 same `ref`/`data` rules, idempotent retries. Response echoes the merged
 payload.
+
+**Batch ingest** works the same way — send an `entries` array instead of
+`ref`/`data`, up to 100 entries per request:
+
+```bash
+curl -s -X POST https://<formr-host>/api/ingest/my_study/fri_YOUR_KEY \
+  -H "Content-Type: application/json" \
+  -d '{"entries":[{"ref":"p1","data":{"score":7}},{"ref":"p2","data":{"score":3}}]}'
+```
+
+Response (`200`):
+
+```json
+{
+  "source": "scoring_engine",
+  "entries": [
+    { "ref": "p1", "payload": { "score": 7 } },
+    { "ref": "p2", "payload": { "score": 3 } }
+  ]
+}
+```
+
+All-or-nothing: if any entry is invalid the entire batch is rejected.
 
 **Errors:** `400` bad body; `401` missing/unknown/revoked key; `404` the
 key is valid but the `<run>` in the URL isn't the key's run; `405`

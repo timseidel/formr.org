@@ -39,13 +39,15 @@ class ExternalData extends Model
      */
     const SOURCE_PATTERN = '/^[A-Za-z0-9_.-]{1,50}$/';
 
+    const BATCH_LIMIT = 100;
+
     public static function isValidSource($name)
     {
         return is_string($name) && preg_match(self::SOURCE_PATTERN, $name) === 1;
     }
 
     /**
-     * Validate the ref + data of a write, shared by the OAuth resource
+     * Validate the ref + data of a single write, shared by the OAuth resource
      * (ExternalDataResource) and the non-OAuth ingest endpoint
      * (ApiController::ingestAction) so both enforce identical rules.
      *
@@ -56,10 +58,41 @@ class ExternalData extends Model
         if (!is_string($ref) || trim($ref) === '' || strlen($ref) > 191) {
             return "A non-empty 'ref' (max 191 chars) is required.";
         }
-        // data must be a JSON object, not a scalar or list — the payload
-        // is a key->value document and JSON_MERGE_PATCH expects an object.
         if (!is_array($data) || (count($data) > 0 && array_keys($data) === range(0, count($data) - 1))) {
             return "'data' must be a JSON object of key/value pairs.";
+        }
+        return null;
+    }
+
+    /**
+     * Validate a batch of entries for batch ingestion.
+     *
+     * Returns null if the entire batch is valid, or an error string
+     * describing the first problem found (including the 0-based entry
+     * index for easy debugging). Rejects the entire batch on any
+     * validation failure — no partial writes.
+     *
+     * @param array $entries List of ['ref' => ..., 'data' => ...]
+     * @return string|null
+     */
+    public static function validateBatch(array $entries)
+    {
+        if (empty($entries)) {
+            return "'entries' must be a non-empty array.";
+        }
+        if (count($entries) > self::BATCH_LIMIT) {
+            return "Batch too large: " . count($entries) . " entries (max " . self::BATCH_LIMIT . ").";
+        }
+        foreach ($entries as $i => $entry) {
+            if (!is_array($entry)) {
+                return "entries[" . $i . "]: must be a JSON object with 'ref' and 'data'.";
+            }
+            $ref = isset($entry['ref']) ? $entry['ref'] : null;
+            $data = isset($entry['data']) ? $entry['data'] : null;
+            $err = self::validateRefAndData($ref, $data);
+            if ($err !== null) {
+                return "entries[" . $i . "]: " . $err;
+            }
         }
         return null;
     }
@@ -115,6 +148,41 @@ class ExternalData extends Model
 
         $rows = self::getForRun($run_id, $source_name, $external_ref);
         return isset($rows[0]) ? $rows[0]['payload'] : null;
+    }
+
+    /**
+     * Batch create-or-merge for multiple refs under the same source.
+     *
+     * Wraps all merges in a single DB transaction so the batch is
+     * all-or-nothing. Returns an array of per-entry results in the
+     * same order as $entries, each being the merged payload array or
+     * null on failure.
+     *
+     * @param int    $run_id
+     * @param string $source_name
+     * @param array  $entries   List of ['ref' => ..., 'data' => ...]
+     * @return array[] List of ['ref' => string, 'payload' => array|null]
+     */
+    public static function mergePayloadBatch($run_id, $source_name, array $entries)
+    {
+        $db = DB::getInstance();
+        $db->beginTransaction();
+        $results = array();
+
+        try {
+            foreach ($entries as $entry) {
+                $ref = trim($entry['ref']);
+                $partial = $entry['data'];
+                $merged = self::mergePayload($run_id, $source_name, $ref, $partial);
+                $results[] = array('ref' => $ref, 'payload' => $merged);
+            }
+            $db->commit();
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+
+        return $results;
     }
 
     /**

@@ -3,13 +3,12 @@
 /**
  * External key-value storage smoke check (live MariaDB).
  *
- * Exercises ExternalData::mergePayload / getForRun against a real
- * MariaDB: atomic create-on-write, partial JSON_MERGE_PATCH merge
- * (untouched keys survive), RFC 7386 null-key deletion, source
- * filtering, and PHP-side key projection. PHPUnit can't host this — the
- * SQLite :memory: test bootstrap lacks JSON_MERGE_PATCH and
- * ON DUPLICATE KEY UPDATE … VALUES() (same reason as the Track A
- * smokes).
+ * Exercises ExternalData::mergePayload / mergePayloadBatch / getForRun
+ * against a real MariaDB: atomic create-on-write, partial JSON_MERGE_PATCH
+ * merge (untouched keys survive), RFC 7386 null-key deletion, source
+ * filtering, PHP-side key projection, and batch ingestion. PHPUnit can't
+ * host this — the SQLite :memory: test bootstrap lacks JSON_MERGE_PATCH and
+ * ON DUPLICATE KEY UPDATE … VALUES() (same reason as the Track A smokes).
  *
  * Usage:
  *   docker exec formr_app php /var/www/formr/bin/test_external_data_smoke.php
@@ -95,8 +94,50 @@ try {
     $merged = ExternalData::mergePayload($run_id, $src, $ref, []);
     assert_eq($merged, ['score_b' => 2, 'extra' => 'x'], 'empty patch leaves payload intact');
 
+    // === Batch ingestion ===
+
+    // 10. Batch create — three new refs in one call.
+    $batchRefs = [
+        ['ref' => 'batch_a', 'data' => ['x' => 10]],
+        ['ref' => 'batch_b', 'data' => ['y' => 20]],
+        ['ref' => 'batch_c', 'data' => ['z' => 30]],
+    ];
+    $batchResult = ExternalData::mergePayloadBatch($run_id, $src, $batchRefs);
+    assert_eq(count($batchResult), 3, 'batch returns 3 entries');
+    assert_eq($batchResult[0]['ref'], 'batch_a', 'batch entry 0 ref');
+    assert_eq($batchResult[0]['payload'], ['x' => 10], 'batch entry 0 payload');
+    assert_eq($batchResult[1]['ref'], 'batch_b', 'batch entry 1 ref');
+    assert_eq($batchResult[1]['payload'], ['y' => 20], 'batch entry 1 payload');
+    assert_eq($batchResult[2]['ref'], 'batch_c', 'batch entry 2 ref');
+    assert_eq($batchResult[2]['payload'], ['z' => 30], 'batch entry 2 payload');
+
+    // 11. Batch merge — partial update across existing refs.
+    $batchMerge = [
+        ['ref' => 'batch_a', 'data' => ['added' => true]],
+        ['ref' => 'batch_b', 'data' => ['y' => 99]],
+    ];
+    $batchResult = ExternalData::mergePayloadBatch($run_id, $src, $batchMerge);
+    assert_eq($batchResult[0]['payload'], ['x' => 10, 'added' => true], 'batch merge preserves prior key');
+    assert_eq($batchResult[1]['payload'], ['y' => 99], 'batch merge overwrites key');
+
+    // 12. Batch rollback on failure — transaction should roll back all.
+    //    We can't trigger a DB-level failure easily in a smoke test, so we
+    //    test that validation catches a bad entry before any writes happen.
+    $badBatch = [
+        ['ref' => 'batch_d', 'data' => ['ok' => true]],
+        ['ref' => '', 'data' => ['bad' => true]],
+    ];
+    $err = ExternalData::validateBatch($badBatch);
+    assert_eq($err !== null, true, 'batch validation rejects empty ref');
+    assert_eq(strpos($err, 'entries[1]') !== false, true, 'batch validation reports entry index');
+
+    // 13. Batch limit check.
+    $tooMany = array_fill(0, 101, ['ref' => 'x', 'data' => ['v' => 1]]);
+    $err = ExternalData::validateBatch($tooMany);
+    assert_eq($err !== null, true, 'batch over limit rejected');
+
     echo $failures === 0 ? "\n\e[32mAll external KV smoke checks passed.\e[0m\n"
-                         : "\n\e[31m{$failures} check(s) failed.\e[0m\n";
+                          : "\n\e[31m{$failures} check(s) failed.\e[0m\n";
 } catch (Throwable $e) {
     fwrite(STDERR, "EXCEPTION: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n");
     $failures++;

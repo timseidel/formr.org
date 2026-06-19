@@ -181,23 +181,61 @@ class ApiController extends Controller
         if (!is_array($body)) {
             return $this->ingestError(Response::STATUS_BAD_REQUEST, 'Request body must be a JSON object.');
         }
+
+        // source is pinned to the key — body cannot override it.
+        $source_name = $row['source_name'];
+        $run_id = (int) $row['run_id'];
+
+        // Batch mode: top-level "entries" array with per-entry ref+data.
+        if (isset($body['entries']) && is_array($body['entries'])) {
+            return $this->ingestBatch($run_id, $source_name, $body['entries'], $row['id']);
+        }
+
+        // Single-ref mode (original).
         $ref = isset($body['ref']) ? $body['ref'] : null;
         $data = isset($body['data']) ? $body['data'] : null;
         if ($err = ExternalData::validateRefAndData($ref, $data)) {
             return $this->ingestError(Response::STATUS_BAD_REQUEST, $err);
         }
 
-        // source is pinned to the key — body cannot override it.
-        $merged = ExternalData::mergePayload((int) $row['run_id'], $row['source_name'], trim($ref), $data);
+        $merged = ExternalData::mergePayload($run_id, $source_name, trim($ref), $data);
         if ($merged === null && $data !== array()) {
             return $this->ingestError(Response::STATUS_INTERNAL_SERVER_ERROR, 'Failed to store ingestion data.');
         }
         RunIngestKey::touchLastUsed($row['id']);
 
         return $this->respond(Response::STATUS_OK, 'OK', array(
-            'source' => $row['source_name'],
+            'source' => $source_name,
             'ref' => trim($ref),
             'payload' => $merged,
+        ));
+    }
+
+    private function ingestBatch($run_id, $source_name, array $entries, $key_id)
+    {
+        if ($err = ExternalData::validateBatch($entries)) {
+            return $this->ingestError(Response::STATUS_BAD_REQUEST, $err);
+        }
+
+        // Validate all entries before writing anything.
+        foreach ($entries as $i => $entry) {
+            $ref = isset($entry['ref']) ? $entry['ref'] : null;
+            $data = isset($entry['data']) ? $entry['data'] : null;
+            if ($err = ExternalData::validateRefAndData($ref, $data)) {
+                return $this->ingestError(Response::STATUS_BAD_REQUEST, "entries[{$i}]: {$err}");
+            }
+        }
+
+        try {
+            $results = ExternalData::mergePayloadBatch($run_id, $source_name, $entries);
+        } catch (\Exception $e) {
+            return $this->ingestError(Response::STATUS_INTERNAL_SERVER_ERROR, 'Failed to store batch: ' . $e->getMessage());
+        }
+        RunIngestKey::touchLastUsed($key_id);
+
+        return $this->respond(Response::STATUS_OK, 'OK', array(
+            'source' => $source_name,
+            'entries' => $results,
         ));
     }
 
