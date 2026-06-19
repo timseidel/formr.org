@@ -5,11 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ## [Unreleased]
 
 ### Added
-- **External key-value storage** for asynchronous data from external tools (scoring engines, CRMs, webhooks). A new `/api/v1/runs/{name}/external_data` endpoint lets an authorized OAuth client push state-independent JSON into a run with no active participant session and without touching the live run flow. Data is namespaced by a `source` and keyed by an author-chosen `ref` (e.g. a `calculate` item value) — the `ref` is a routing key, not a credential: access is gated by the per-client run allowlist (`oauth_client_runs`) and the new `data:write` scope. Partial updates are merged atomically at the DB level via `JSON_MERGE_PATCH` (RFC 7386 — a `null` value deletes that key), so concurrent external writers can't clobber each other. Survey logic reads the data back via the API (`data:read`), filtered by source/ref. New `ExternalData` model and `ExternalDataResource`; the participant `session` login code is never used as the reference and never leaves formr.
+- **External key-value storage** for asynchronous data from external tools (scoring engines, CRMs, webhooks). A new `/api/v1/runs/{name}/external_data` endpoint lets an authorized OAuth client push state-independent JSON into a run with no active participant session and without touching the live run flow. Data is namespaced by a `source` and keyed by an author-chosen `ref` (e.g. a `calculate` item value) — the `ref` is a routing key, not a credential: access is gated by the per-client run allowlist (`oauth_client_runs`) and dedicated `external_data:read` / `external_data:write` scopes (kept separate from `data:*`, which grants access to participant survey responses). Partial updates are merged atomically at the DB level via `JSON_MERGE_PATCH` (RFC 7386 — a `null` value deletes that key), so concurrent external writers can't clobber each other. Survey logic reads the data back via the API (`external_data:read`), filtered by source/ref. New `ExternalData` model and `ExternalDataResource`; the participant `session` login code is never used as the reference and never leaves formr.
 
 ### Schema
 - `sql/patches/060_create_external_data.sql` — new `survey_external_data` table (`payload` LONGTEXT, `CHECK (JSON_VALID(...))`, unique on `(run_id, source_name, external_ref)`, FK to `survey_runs` ON DELETE CASCADE).
-- `sql/patches/061_add_data_write_scope.sql` — seeds the `data:write` OAuth scope (idempotent).
+- `sql/patches/061_add_external_data_scopes.sql` — seeds the `external_data:read` / `external_data:write` OAuth scopes (idempotent).
 
 ## [v1.1.1] - 11.06.2026
 

@@ -7,7 +7,7 @@
 -- `external_ref` is a free-text reference the SURVEY AUTHOR generates
 -- (e.g. a `calculate` item value); formr does not mint or own it. The
 -- ref is a routing key, not a credential — run-scoped OAuth
--- (oauth_client_runs / data:write) is what actually gates access.
+-- (oauth_client_runs / external_data:write) is what actually gates access.
 --
 -- `payload` is a JSON document stored as LONGTEXT (MariaDB's JSON type),
 -- guarded by JSON_VALID like survey_unit_sessions.state_log (patch 047).

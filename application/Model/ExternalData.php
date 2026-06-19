@@ -9,7 +9,7 @@
  * namespaced by `source_name`; the `external_ref` is a reference the
  * survey author generates (e.g. a `calculate` item value) and hands to
  * the external tool — formr does not mint it. The ref is a routing key,
- * not a credential: run-scoped OAuth (oauth_client_runs / data:write) is
+ * not a credential: run-scoped OAuth (oauth_client_runs / external_data:write) is
  * what gates access.
  *
  * Partial updates are applied atomically at the DB level with

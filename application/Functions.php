@@ -1226,7 +1226,11 @@ function opencpu_prepare_api_access($code, &$variables)
     // owns. Without $forRun, the token would inherit the owner's
     // per-client allowlist (commonly empty = unrestricted), which is
     // wider than what this short-lived helper needs.
-    $token_data = $oauth->createAccessTokenForUser($owner, 'user:read session:read session:write run:read data:read', false, 180, $run);
+    // external_data:read lets study R logic read external key-value data
+    // (formr_api_authenticate() + GET external_data) for branching. Read
+    // only — the study never writes external data through the run token;
+    // that is the external tool's job via the client_credentials grant.
+    $token_data = $oauth->createAccessTokenForUser($owner, 'user:read session:read session:write run:read data:read external_data:read', false, 180, $run);
 
     if (!$token_data || empty($token_data['access_token'])) {
         return null;

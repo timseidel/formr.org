@@ -5,8 +5,8 @@ class AdminAccountController extends Controller {
 
     /**
      * Human-readable labels for the OAuth scopes seeded by
-     * sql/patches/049_add_oauth_scopes.sql (+ data:write, patch 061).
-     * Kept on the controller (not
+     * sql/patches/049_add_oauth_scopes.sql (+ external_data:read/write,
+     * patch 061). Kept on the controller (not
      * in the DB) so the label set tracks the code that consumes the
      * scope strings — and so an instance can't get a partially-
      * translated set if the DB seed lags behind the app.
@@ -21,7 +21,8 @@ class AdminAccountController extends Controller {
         'session:read' => 'Read participant sessions',
         'session:write'=> 'Create / advance / delete sessions',
         'data:read'    => 'Read participant response data',
-        'data:write'   => 'Write external key-value data to runs',
+        'external_data:read'  => 'Read external key-value data on runs',
+        'external_data:write' => 'Write external key-value data to runs',
         'file:read'    => 'Download files attached to runs',
         'file:write'   => 'Upload files to runs',
     ];

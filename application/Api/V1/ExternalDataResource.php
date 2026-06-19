@@ -8,9 +8,13 @@
  * `source` namespace and an author-chosen `ref`; survey logic reads it
  * back to make branching decisions.
  *
- *   GET  ?source=&ref=&keys=   data:read   list rows for the run
- *   POST  {ref, source, data}  data:write  atomic create-or-merge
- *   PATCH {ref, source, data}  data:write  (alias of POST — partial merge)
+ *   GET  ?source=&ref=&keys=   external_data:read   list rows for the run
+ *   POST  {ref, source, data}  external_data:write  atomic create-or-merge
+ *   PATCH {ref, source, data}  external_data:write  (alias of POST — partial merge)
+ *
+ * Note the dedicated external_data:* scopes: data:read grants read of
+ * participant survey responses (/results), so reusing it here would let
+ * an external KV reader dump response data too.
  *
  * Run-level authorization (the calling client may only touch runs on its
  * oauth_client_runs allowlist) is enforced by getRunByName(). The `ref`
@@ -27,9 +31,9 @@ class ExternalDataResource extends BaseResource
         // Scope first, so a token lacking the right grant gets a clean
         // 403 regardless of whether the run exists (mirrors SessionResource).
         if ($method === 'GET') {
-            $this->checkScope('data:read');
+            $this->checkScope('external_data:read');
         } elseif ($method === 'POST' || $method === 'PATCH') {
-            $this->checkScope('data:write');
+            $this->checkScope('external_data:write');
         } else {
             return $this->error(405, 'Method not allowed');
         }
