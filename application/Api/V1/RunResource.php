@@ -89,6 +89,9 @@ class RunResource extends BaseResource
             case 'structure':
                 $resourceClass = new StructureResource($this->request, $this->db, $this->tokenData);
                 break;
+            case 'external_data':
+                $resourceClass = new ExternalDataResource($this->request, $this->db, $this->tokenData);
+                break;
             default:
                 return $this->error(404, 'Run sub-resource not found');
         }
