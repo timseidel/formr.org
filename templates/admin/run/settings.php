@@ -412,22 +412,6 @@ my_score <- function(data) {
                                                 JavaScript is required to manage ingestion keys.
                                             </div>
                                         </noscript>
-
-                                        <h4 class="lead" style="margin-top: 30px;"><i class="fa fa-download"></i> Export external data</h4>
-                                        <p class="text-muted small">
-                                            <i class="fa fa-info-circle"></i> Download all external key-value data for this run. Each row is one <code>(source, ref)</code> pair with the payload flattened into columns. Nested values appear as JSON strings.
-                                        </p>
-                                        <div class="btn-group">
-                                            <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-                                                <i class="fa fa-floppy-o"></i> Download external data <span class="caret"></span>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a href="<?= admin_run_url($run->name, 'export_external_data?format=csv') ?>"><i class="fa fa-floppy-o"></i> CSV</a></li>
-                                                <li><a href="<?= admin_run_url($run->name, 'export_external_data?format=tsv') ?>"><i class="fa fa-floppy-o"></i> TSV</a></li>
-                                                <li><a href="<?= admin_run_url($run->name, 'export_external_data?format=xlsx') ?>"><i class="fa fa-floppy-o"></i> XLSX</a></li>
-                                                <li><a href="<?= admin_run_url($run->name, 'export_external_data?format=json') ?>"><i class="fa fa-floppy-o"></i> JSON</a></li>
-                                            </ul>
-                                        </div>
                                     </div>
                                 </div>
                                 <!-- /.tab-pane -->

@@ -64,6 +64,14 @@
                     <li><a href="<?php echo admin_run_url($run->name, 'export_data?format=json'); ?>"><i class="fa fa-floppy-o"></i> Download JSON</a></li>
                 </ul>
             </li>
+            <li class="dropdown"><a title="Download external key-value data (ingestion keys). Each row is one source + ref pair with JSON payload keys flattened into columns." href="#" data-toggle="dropdown" aria-expanded="false" class="dropdown-toggle"><i class="fa fa-database"></i> Export External Data</a>
+                <ul class="dropdown-menu">
+                    <li><a href="<?php echo admin_run_url($run->name, 'export_external_data?format=csv'); ?>"><i class="fa fa-floppy-o"></i> Download CSV</a></li>
+                    <li><a href="<?php echo admin_run_url($run->name, 'export_external_data?format=tsv'); ?>"><i class="fa fa-floppy-o"></i> Download TSV</a></li>
+                    <li><a href="<?php echo admin_run_url($run->name, 'export_external_data?format=xlsx'); ?>"><i class="fa fa-floppy-o"></i> Download XLSX</a></li>
+                    <li><a href="<?php echo admin_run_url($run->name, 'export_external_data?format=json'); ?>"><i class="fa fa-floppy-o"></i> Download JSON</a></li>
+                </ul>
+            </li>
         </ul>
     </div>
     <!-- /.box-body -->
