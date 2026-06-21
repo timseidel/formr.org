@@ -2,7 +2,7 @@
 
 <h4>R in formr</h4>
 <p>
-    In formr, you can use R to write simple and complex code. Various places allow you to specify either R code (e.g., showif column, value column, SkipForward/SkipBackward/SkipTo, External, Pause button conditions) or R code interspersed with Markdown (as in knitr, e.g., labels, Stop button, Pause button texts). The R code you wrote will be automatically enriched with the data objects you name and processed using <abbr title="A way to use R on the web safely">OpenCPU</abbr>. By default, your participants cannot view the R code you write.
+    In formr, you can use R to write simple and complex code. Various places allow you to specify either R code (e.g., showif column, value column, SkipForward/SkipBackward, External, Pause button conditions) or R code interspersed with Markdown (as in knitr, e.g., labels, Stop button, Pause button texts). The R code you wrote will be automatically enriched with the data objects you name and processed using <abbr title="A way to use R on the web safely">OpenCPU</abbr>. By default, your participants cannot view the R code you write.
 </p>
 <h4>Automatically enriched data</h4>
 <p>

@@ -70,39 +70,10 @@
                             <div id="run-unit-choices">
                                 <div class="form-group col-lg-12 text-center">
                                     <div class="btn-group">
-                                        <?php
-                                        // Meta for grouped buttons rendered as a single drop-up.
-                                        $unit_button_groups = array(
-                                            'jump' => array('title' => 'Add a jump or skip (forward, loop, computed)', 'icon' => 'fa-share'),
-                                        );
-                                        $rendered_groups = array();
-                                        foreach ($add_unit_buttons as $name => $button):
-                                            $group = $button['group'] ?? null;
-                                            if ($group):
-                                                if (isset($rendered_groups[$group])) { continue; }
-                                                $rendered_groups[$group] = true;
-                                                $members = array_filter($add_unit_buttons, function ($b) use ($group) { return ($b['group'] ?? null) === $group; });
-                                                $meta = $unit_button_groups[$group];
-                                                ?>
-                                                <div class="btn-group dropup">
-                                                    <a class="btn btn-default btn-lg dropdown-toggle" data-toggle="dropdown" href="javascript:void(0);" role="button" aria-haspopup="true" aria-expanded="false" aria-label="<?= $meta['title'] ?>">
-                                                        <i class="fa fa-2x <?= $meta['icon'] ?>"></i> <span class="caret"></span>
-                                                    </a>
-                                                    <ul class="dropdown-menu" role="menu">
-                                                        <?php foreach ($members as $mname => $mbutton): ?>
-                                                            <li>
-                                                                <a class="add_<?= strtolower($mname) ?> add_run_unit" href="<?= admin_run_url($run->name, 'ajax_create_run_unit?type=' . $mname) ?>">
-                                                                    <i class="fa fa-fw <?= $mbutton['icon'] ?>"></i> <?= $mbutton['title'] ?>
-                                                                </a>
-                                                            </li>
-                                                        <?php endforeach; ?>
-                                                    </ul>
-                                                </div>
-                                            <?php else: ?>
-                                                <a class="add_<?= strtolower($name)?> add_run_unit btn btn-default btn-lg hastooltip" title="<?= $button['title'] ?>" href="<?= admin_run_url($run->name, 'ajax_create_run_unit?type=' . $name) ?>" >
-                                                    <i class="fa fa-2x <?= $button['icon'] ?>"></i>
-                                                </a>
-                                            <?php endif; ?>
+                                        <?php foreach ($add_unit_buttons as $name => $button): ?>
+                                            <a class="add_<?= strtolower($name)?> add_run_unit btn btn-default btn-lg hastooltip" title="<?= $button['title'] ?>" href="<?= admin_run_url($run->name, 'ajax_create_run_unit?type=' . $name) ?>" >
+                                                <i class="fa fa-2x <?= $button['icon'] ?>"></i>
+                                            </a>
                                         <?php endforeach; ?>
                                     </div>
                                     <h5 class="text-center">click one of the symbols above to add a module</h5> 

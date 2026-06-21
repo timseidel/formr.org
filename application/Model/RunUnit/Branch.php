@@ -133,6 +133,24 @@ class Branch extends RunUnit {
             $data['log'] = $this->getLogMessage('opencpu_result_warn', "Your R code is returning more than one result. Please fix your code, so it returns only true/false");
         }
 
+        // Numeric return → treat as absolute run position (computed jump).
+        // is_bool() is explicitly checked first because PHP considers true/false numeric in some contexts.
+        if (!is_bool($eval) && is_numeric($eval)) {
+            $target = (int) round((float) $eval);
+            if ($unitSession->runSession->getUnitIdAtPosition($target)) {
+                $data['log'] = $this->getLogMessage('skip_to', "Computed jump to position $target.");
+                $data['end_session'] = true;
+                $data['run_to'] = $target;
+            } else {
+                $reason = "Skip unit: computed position $target has no unit; continuing after the skip.";
+                notify_study_admin($unitSession, $reason, 'error');
+                $data['log'] = $this->getLogMessage('skip_to_invalid', $reason);
+                $data['end_session'] = $data['move_on'] = true;
+            }
+            $this->outputData = $data;
+            return $data;
+        }
+
         if($eval === true || $eval === false) {
             $result = $eval;
         } else {

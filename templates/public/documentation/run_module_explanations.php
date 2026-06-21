@@ -257,6 +257,13 @@
                 <p>
                     In this scenario, the participant takes part in the short survey first. We obtain the geolocation, which can be used to retrieve the local weather using API calls to weather information services in the Skip Backward at position 30. The weather gets checked once each day (pause at 20) and if there ever is a thunderstorm in the area, the participant is invited via email (40) to take a survey (50) detailing their experience of the thunderstorm. This way, the participants only get invited when necessary, we don't have to ask them to report weather events on a daily basis and risk driving them away.
                 </p>
+                <h4>Advanced: <small>computed jumps (return a position number)</small></h4>
+                <p>
+                    Instead of a TRUE/FALSE condition, your R code can return a <strong>position number</strong> — the participant then jumps straight to that position, ignoring the "skip backward to" field. This lets a single unit send different participants to different positions: e.g. <code>c(30, 50, 70)[screener$arm]</code> routes arm 1 to 30, arm 2 to 50, arm 3 to 70. The same works in a Skip Forward.
+                </p>
+                <p>
+                    <small class="text-muted">If the returned position has no unit, the participant continues to the next unit after the skip — they are never stranded. Position numbers are literal; re-check your code after large reorders.</small>
+                </p>
             </div>
         </div>
     </div>
@@ -368,59 +375,12 @@
                 <p>
                     Starting at 10, participants would complete a survey on optimism. If they indicated that they are pessimists, they fill out a different survey than if they are optimists. Both groups receive the same feedback at the end. It is important to note that we have to let the optimists jump over the survey tailored to pessimists at position 40, so that they do not have to take both surveys.
                 </p>
-            </div>
-        </div>
-    </div>
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <a class="accordion-toggle" data-toggle="collapse" href="#skip_to">
-                <i class="fa-fw fa fa-arrows-alt pull-left fa-3x"></i>
-                Skip To<br>
-                <small>computed jumps, multi-arm routing</small></a>
-        </div>
-        <div id="skip_to" class="panel-collapse collapse skip_to">
-            <div class="panel-body">
+                <h4>Advanced: <small>computed jumps (return a position number)</small></h4>
                 <p>
-                    Skip To evaluates R code that returns a <strong>position number</strong> and jumps the participant straight to that position. Where a Skip Forward jumps to one fixed position only when a condition is true, a Skip To <em>computes</em> its destination — so a single unit can send different participants to different positions, replacing a whole stack of Skip Forwards.
+                    Instead of a TRUE/FALSE condition, your R code can return a <strong>position number</strong> — the participant then jumps straight to that position, ignoring the "skip forward to" field. This lets a single unit send different participants to different arms: e.g. <code>c(30, 50, 70)[screener$arm]</code> routes arm 1 to 30, arm 2 to 50, arm 3 to 70. The same works in a Skip Backward.
                 </p>
                 <p>
-                    If the number returned has no unit sitting exactly at that position, the participant is sent to the next existing position after it. If the code returns something that is not a number, the participant simply continues to the next unit (so a mistake never strands anyone).
-                </p>
-                <h4>
-                    Example: <small>routing to one of several arms</small>
-                </h4>
-                <p>
-                    Let's say your run contains
-                </p>
-                <ul class="fa-ul">
-                    <li>
-                        <i class="fa-li fa fa-pencil-square"></i> 	Pos. 10. a screener survey with an item <code>arm</code> that is 1, 2 or 3.
-                    </li>
-                    <li>
-                        <i class="fa-li fa fa-arrows-alt"></i> 		Pos. 20. a Skip To with <code>c(30, 50, 70)[screener$arm]</code>. Arm 1 jumps to 30, arm 2 to 50, arm 3 to 70 — all from one unit.
-                    </li>
-                    <li><i class="fa-li fa fa-pencil-square"></i> 	Pos. 30. the survey for arm 1.
-                    </li>
-                    <li><i class="fa-li fa fa-arrows-alt"></i> 		Pos. 40. a Skip To with <code>90</code>, sending arm 1 to the shared end.
-                    </li>
-                    <li><i class="fa-li fa fa-pencil-square"></i> 	Pos. 50. the survey for arm 2.
-                    </li>
-                    <li><i class="fa-li fa fa-arrows-alt"></i> 		Pos. 60. a Skip To with <code>90</code>.
-                    </li>
-                    <li><i class="fa-li fa fa-pencil-square"></i> 	Pos. 70. the survey for arm 3.
-                    </li>
-                    <li>
-                        <i class="fa-li fa fa-stop"></i> 			Pos. 90. a Stop point with feedback shown to every participant.
-                    </li>
-                </ul>
-                <h5>
-                    What would happen?
-                </h5>
-                <p>
-                    After the screener, the single Skip To at position 20 routes each participant to their arm — no need to stack two Skip Forwards to separate three groups. Arms 1 and 2 then each use a small Skip To to jump over the remaining arms to the shared end at 90; arm 3 is already last, so it simply continues to 90.
-                </p>
-                <p>
-                    <small class="text-muted">The position numbers in your R code are literal: they are not automatically rebased when a run is imported with an offset or when you renumber units. Reference stable positions and re-check your Skip To code after large reorders.</small>
+                    <small class="text-muted">If the returned position has no unit, the participant continues to the next unit after the skip — they are never stranded. Position numbers are literal; re-check your code after large reorders.</small>
                 </p>
             </div>
         </div>
