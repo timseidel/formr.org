@@ -2,6 +2,11 @@
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixes
+- `SpreadsheetReader` out-of-memory (HTTP 500) on `.xlsx` uploads with a stray cell far down a sheet — typically an empty-but-styled cell at the Excel maximum row (`A1048576`) left behind by a copy/paste or a template. Such a cell inflates `getHighestDataRow()` to ~1,048,576, and the row iterator (with `setIterateOnlyExistingCells(false)`) then materializes a `Cell` object per row/column until PHP exhausts its 512 MB limit — a fatal memory error that surfaces deep in PhpSpreadsheet (`Coordinate.php`) and, being a fatal rather than a `\Throwable`, cannot be caught. Both `readChoicesSheet()` and `readSurveySheet()` now refuse a sheet reporting more than `SpreadsheetReader::MAX_DATA_ROWS` (50,000) rows with a clear, actionable error before iterating, telling the author to delete the empty rows below their data. This is the row-axis counterpart to the v1.1.0 column-axis fix for the same class of spreadsheet bloat. The `catch` in `readItemTableFile()` was also widened from `PhpOffice\PhpSpreadsheet\Exception` to `\Throwable` so reader-internal `TypeError`s degrade to a graceful error instead of a 500 (the memory fatal stays uncatchable — the row cap is its guard). Regression-tested in `tests/SpreadsheetReaderRowCapTest.php`.
+
 ## [v1.1.1] - 11.06.2026
 
 ### Fixes
