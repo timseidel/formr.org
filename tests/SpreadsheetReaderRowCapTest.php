@@ -114,6 +114,26 @@ class SpreadsheetReaderRowCapTest extends TestCase
         $this->assertEmpty($reader->choices, 'No choices should be parsed from a refused sheet');
     }
 
+    public function testChoicesSheetFailureDoesNotCascadeIntoSurveySheet()
+    {
+        // A bloated choices sheet must produce exactly ONE clean error, not a
+        // cascade: previously readSurveySheet() still ran, and its
+        // "if ($this->errors)" guard re-wrapped and re-threw the choices error on
+        // the first cell, adding the generic "An error occured reading your excel
+        // file" message plus a duplicate "Error in cell B2 (Survey Sheet): ...".
+        $path = $this->makeWorkbook(array(
+            'survey' => $this->surveyRows(),
+            'choices' => $this->choicesRows(),
+        ), 'choices');
+        $reader = new SpreadsheetReader();
+        $reader->readItemTableFile($path);
+
+        $this->assertCount(1, $reader->errors, 'A bloated choices sheet should yield exactly one error');
+        $joined = implode("\n", $reader->errors);
+        $this->assertStringNotContainsString('An error occured reading your excel file', $joined);
+        $this->assertStringNotContainsString('Survey Sheet', $joined);
+    }
+
     public function testStrayCellOnSurveySheetIsRefused()
     {
         $path = $this->makeWorkbook(array(

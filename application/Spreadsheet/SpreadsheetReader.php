@@ -506,7 +506,16 @@ class SpreadsheetReader
                 $this->readChoicesSheet($choicesSheet);
             }
 
-            $this->readSurveySheet($surveySheet);
+            // Short-circuit if the choices sheet already failed. The survey loop's
+            // "if ($this->errors)" guard cannot distinguish errors it raises itself
+            // from ones carried over from the choices sheet, so it would re-wrap and
+            // re-throw the choices error on the very first cell — yielding duplicate,
+            // misattributed messages ("Error in cell B2 (Survey Sheet): <choices
+            // error>"). A failed choices sheet also makes the survey sheet (which
+            // references those choice lists) unreadable anyway.
+            if (!$this->errors) {
+                $this->readSurveySheet($surveySheet);
+            }
         } catch (\Throwable $e) {
             // Widened from PhpSpreadsheet\Exception to \Throwable so TypeErrors
             // and other reader internals surface as a graceful error rather than
